@@ -1,6 +1,7 @@
 package de.erethon.hephaestus.items;
 
 import org.bukkit.NamespacedKey;
+import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
 import java.util.HashMap;
@@ -30,6 +31,10 @@ public class ItemLibrary {
 
     private void load() {
         loadFilesForDirectory(dataDirectory);
+    }
+
+    public void register(ItemStack item, NamespacedKey key){
+        net.minecraft.world.item.ItemStack nmsItem = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(item);
     }
 
     private void loadFilesForDirectory(File directory) {
