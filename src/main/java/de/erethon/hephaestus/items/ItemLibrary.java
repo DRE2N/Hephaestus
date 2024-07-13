@@ -13,7 +13,6 @@ public class ItemLibrary {
 
     public ItemLibrary(File file) {
         dataDirectory = file;
-        load();
     }
 
     public HItem get(NamespacedKey key) {
@@ -29,12 +28,19 @@ public class ItemLibrary {
         load();
     }
 
-    private void load() {
+    public void load() {
         loadFilesForDirectory(dataDirectory);
     }
 
     public void register(ItemStack item, NamespacedKey key){
         net.minecraft.world.item.ItemStack nmsItem = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(item);
+        HItem hItem = new HItem(key, nmsItem.getItem(), nmsItem.getComponentsPatch());
+        items.put(key, hItem);
+        saveFilesForDirectory(dataDirectory);
+    }
+
+    public void save() {
+        saveFilesForDirectory(dataDirectory);
     }
 
     private void loadFilesForDirectory(File directory) {
@@ -50,6 +56,16 @@ public class ItemLibrary {
                 HItem item = new HItem(file);
                 items.put(item.getKey(), item);
             }
+        }
+    }
+
+    private void saveFilesForDirectory(File directory) {
+        if (directory == null) {
+            directory.mkdirs();
+        }
+        for (HItem item : items.values()) {
+            File file = new File(directory, item.getKey().getKey() + ".yml");
+            item.save(file);
         }
     }
 }

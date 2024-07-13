@@ -20,6 +20,7 @@ import io.papermc.paper.registry.set.RegistrySet;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.ResourceKeyArgument;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -43,19 +44,30 @@ public class HephaestusBootstrap implements PluginBootstrap {
 
         manager.registerEventHandler(LifecycleEvents.COMMANDS, e -> {
             final Commands commands = e.registrar();
-            commands.register(Commands.literal("hephaestus").executes(ctx -> Command.SINGLE_SUCCESS).then(Commands.literal("reload").executes(ctx -> {
-                ctx.getSource().getSender().sendRichMessage("<green>Reloading...");
-                itemLibrary.reload();
-                ctx.getSource().getSender().sendRichMessage("<green>Reloaded Item Library.");
-                return Command.SINGLE_SUCCESS;
-            })).requires(s -> s.getSender().hasPermission("hephaestus.reload")).then(Commands.literal("register").then(RequiredArgumentBuilder.argument("key", ArgumentTypes.namespacedKey())).executes(ctx -> {
-                ctx.getSource().getSender().sendRichMessage("Parsing Item in hand...");
-                Player player = (Player) ctx.getSource().getSender();
-                NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
-                itemLibrary.register(player.getInventory().getItemInMainHand(), key);
-                ctx.getSource().getSender().sendRichMessage("Registered Item with key " + key.toString() + ".");
-                return Command.SINGLE_SUCCESS;
-            })).requires(s -> s.getSender().hasPermission("hephaestus.register")).build(), "Main Hephaestus command.", List.of("he", "hp", "h", "hh"));
+            commands.register(Commands.literal("hephaestus")
+                    .executes(ctx -> Command.SINGLE_SUCCESS)
+                    .then(Commands.literal("reload")
+                            .executes(ctx -> {
+                                ctx.getSource().getSender().sendRichMessage("<green>Reloading...");
+                                itemLibrary.reload();
+                                ctx.getSource().getSender().sendRichMessage("<green>Reloaded Item Library.");
+                                return Command.SINGLE_SUCCESS;
+                            }).requires(s -> s.getSender().hasPermission("hephaestus.reload")))
+                    .then(Commands.literal("register")
+                            .then(Commands.argument("key", ArgumentTypes.namespacedKey())
+                                    .executes(ctx -> {
+                                        ctx.getSource().getSender().sendRichMessage("<gray><i>Parsing Item in hand...");
+                                        Player player = (Player) ctx.getSource().getSender();
+                                        NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
+                                        if (player.getInventory().getItemInMainHand().getType() == Material.AIR) {
+                                            player.sendRichMessage("<red>No item in hand.");
+                                            return -1;
+                                        }
+                                        itemLibrary.register(player.getInventory().getItemInMainHand(), key);
+                                        ctx.getSource().getSender().sendRichMessage("<green>Registered Item with key <gray>" + key.toString() + "<green>.");
+                                        return Command.SINGLE_SUCCESS;
+                                    }).requires(s -> s.getSender().hasPermission("hephaestus.register"))))
+                    .build(), "Main Hephaestus command.", List.of("he", "hp", "h", "hh"));
         });
     }
 

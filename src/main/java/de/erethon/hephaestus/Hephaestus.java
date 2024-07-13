@@ -19,6 +19,12 @@ public final class Hephaestus extends JavaPlugin {
     public void onEnable() {
         inventoryListener = new InventoryListener(this);
         Bukkit.getPluginManager().registerEvents(inventoryListener, this);
+        itemLibrary.load();
+    }
+
+    @Override
+    public void onDisable() {
+        itemLibrary.save();
     }
 
     public ItemLibrary getLibrary() {
