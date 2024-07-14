@@ -1,9 +1,8 @@
 package de.erethon.hephaestus.items;
 
-import com.mojang.brigadier.StringReader;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import net.minecraft.commands.arguments.item.ItemParser;
+import de.erethon.hephaestus.utils.HRandom;
 import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
@@ -14,15 +13,18 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.craftbukkit.inventory.SerializableMeta;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 public class HItem {
 
@@ -30,6 +32,10 @@ public class HItem {
     private NamespacedKey key;
     private Item baseItem;
     private DataComponentPatch patch;
+
+    private Map<Integer, Integer> levelWeights = new HashMap<>();
+    private Map<Integer, Integer> slotWeights = new HashMap<>();
+    private Map<String, Integer> rarityWeights = new HashMap<>();
 
     public HItem(File file) {
         this.file = file;
@@ -47,8 +53,20 @@ public class HItem {
         this.file = null;
     }
 
+    public HItemStack rollRandomStack() {
+        HItemStack hStack = new HItemStack(this);
+        hStack.setItemLevel(HRandom.selectWeightedRandomValue(levelWeights));
+        hStack.setRarity(HRarity.valueOf(HRandom.selectWeightedRandomValue(rarityWeights).toUpperCase(Locale.ROOT)));
+        hStack.setMaxUpgrades(HRandom.selectWeightedRandomValue(slotWeights));
+        return new HItemStack(this);
+    }
+
     public NamespacedKey getKey() {
         return key;
+    }
+
+    public Item getBaseItem() {
+        return baseItem;
     }
 
     public ItemStack update(ItemStack stack) {
@@ -56,7 +74,14 @@ public class HItem {
         if (stack.getItem() != baseItem) {
             stack.setItem(baseItem); // Is there a better way?
         }
+        CompoundTag compoundTag = new CompoundTag();
+        compoundTag.putString("hephaestus-id", key.toString());
+        CustomData.set(DataComponents.CUSTOM_DATA, stack, compoundTag);
         return stack;
+    }
+
+    public void update(org.bukkit.inventory.ItemStack stack) {
+        update(org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(stack));
     }
 
     private void load() {
@@ -74,6 +99,9 @@ public class HItem {
             }
             patch = DataComponentPatch.CODEC.parse(MinecraftServer.getDefaultRegistryAccess().createSerializationContext(NbtOps.INSTANCE), unhandledTag).result().get();
         }
+        levelWeights = HRandom.loadWeights(config, "random.level");
+        slotWeights =  HRandom.loadWeights(config, "random.slots");
+        rarityWeights =  HRandom.loadWeights(config, "random.rarity");
     }
 
     public void save(File file) {
@@ -93,6 +121,9 @@ public class HItem {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        config.createSection("random.level", levelWeights);
+        config.createSection("random.slots", slotWeights);
+        config.createSection("random.rarity", rarityWeights);
     }
 
 }

@@ -4,17 +4,19 @@ import de.erethon.hephaestus.Hephaestus;
 import de.erethon.papyrus.ContainerLoadEvent;
 import de.erethon.papyrus.PlayerInventoryLoadEvent;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import org.bukkit.NamespacedKey;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 
-public class InventoryListener implements Listener {
+public class HInventoryListener implements Listener {
 
     private final Hephaestus plugin;
 
-    public InventoryListener(Hephaestus plugin) {
+    public HInventoryListener(Hephaestus plugin) {
         this.plugin = plugin;
     }
 
@@ -38,13 +40,21 @@ public class InventoryListener implements Listener {
         }
     }
 
+    @EventHandler
+    private void onPickup(EntityPickupItemEvent event) {
+        onItemLoad(ItemStack.fromBukkitCopy(event.getItem().getItemStack()));
+    }
+
     private void onItemLoad(ItemStack item) {
+        NamespacedKey key;
         if (!item.has(DataComponents.CUSTOM_DATA)) {
-            // Handle vanilla items on first appearance here
+            key = NamespacedKey.fromString(BuiltInRegistries.ITEM.getKey(item.getItem()).toString());
+            plugin.getLibrary().runIfPresent(key, i -> i.update(item));
             return;
         }
         CompoundTag tag = item.get(DataComponents.CUSTOM_DATA).copyTag();
-        NamespacedKey key = NamespacedKey.fromString(tag.getString("hephaestus-id"));
-        plugin.getLibrary().get(key).update(item);
+        key = NamespacedKey.fromString(tag.getString("hephaestus-id"));
+        plugin.getLibrary().runIfPresent(key, i -> i.update(item));
     }
+
 }

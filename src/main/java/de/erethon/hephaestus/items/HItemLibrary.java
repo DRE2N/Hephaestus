@@ -1,22 +1,30 @@
 package de.erethon.hephaestus.items;
 
+import de.erethon.hephaestus.utils.HLibraryAction;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
 import java.util.HashMap;
 
-public class ItemLibrary {
+public class HItemLibrary {
 
     private final File dataDirectory;
     private final HashMap<NamespacedKey, HItem> items = new HashMap<>();
 
-    public ItemLibrary(File file) {
+    public HItemLibrary(File file) {
         dataDirectory = file;
     }
 
     public HItem get(NamespacedKey key) {
         return items.get(key);
+    }
+
+    public void runIfPresent(NamespacedKey key, HLibraryAction action) {
+        HItem item = items.get(key);
+        if (item != null) {
+            action.execute(item);
+        }
     }
 
     public boolean has(NamespacedKey key) {
