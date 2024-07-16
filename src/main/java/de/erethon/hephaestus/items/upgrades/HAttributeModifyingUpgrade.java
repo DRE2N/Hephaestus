@@ -19,7 +19,7 @@ import java.util.Map;
 
 public class HAttributeModifyingUpgrade extends HItemUpgrade {
 
-    private final Map<Attribute, Map<Integer, Integer>> attributeModifiers = new HashMap<>();
+    private final Map<Attribute, Map<Integer, Map<Double, Integer>>> attributeModifiers = new HashMap<>();
 
     public HAttributeModifyingUpgrade() {
     }
@@ -27,10 +27,14 @@ public class HAttributeModifyingUpgrade extends HItemUpgrade {
     @Override
     public void roll(HItemStack stack) {
         super.roll(stack);
-        for (Map.Entry<Attribute, Map<Integer, Integer>> entry : attributeModifiers.entrySet()) {
-            stack.getStack().get(DataComponents.ATTRIBUTE_MODIFIERS).modifiers()
-                    .add(new ItemAttributeModifiers.Entry((Holder<Attribute>) entry.getKey(), new AttributeModifier(ResourceLocation.parse("hephaestus:" + id),
-                            HRandom.selectWeightedRandomValue(entry.getValue()), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.ANY));
+        int itemLevel = stack.getItemLevel();
+        for (Map.Entry<Attribute, Map<Integer, Map<Double, Integer>>> entry : attributeModifiers.entrySet()) {
+            Map<Double, Integer> levelModifiers = entry.getValue().get(itemLevel);
+            if (levelModifiers != null) {
+                stack.getVanillaStack().get(DataComponents.ATTRIBUTE_MODIFIERS).modifiers()
+                        .add(new ItemAttributeModifiers.Entry((Holder<Attribute>) entry.getKey(), new AttributeModifier(ResourceLocation.parse("hephaestus:" + id),
+                                HRandom.selectWeightedRandomValue(levelModifiers), AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.ANY));
+            }
         }
     }
 
@@ -45,7 +49,13 @@ public class HAttributeModifyingUpgrade extends HItemUpgrade {
             if (attribute == null) {
                 continue;
             }
-            attributeModifiers.put(attribute, HRandom.loadWeights(config, "attributes." + key));
+            Map<Integer, Map<Double, Integer>> levelModifiers = new HashMap<>();
+            var attributeSection = config.getConfigurationSection("attributes." + key);
+            for (String levelKey : attributeSection.getKeys(false)) {
+                int level = Integer.parseInt(levelKey);
+                levelModifiers.put(level, HRandom.loadWeights(config, "attributes." + key + "." + levelKey));
+            }
+            attributeModifiers.put(attribute, levelModifiers);
         }
         return config;
     }
