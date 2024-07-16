@@ -24,22 +24,36 @@ public class HItemStack {
     public HItemStack(HItem item) {
         this.item = item;
         stack = new ItemStack(item.getBaseItem());
+        stack.applyComponents(item.getPatch());
+        item.update(stack);
     }
 
     public HItemStack(HItem item, ItemStack stack) {
         this.stack = stack;
         this.item = item;
         loadDataFromNBT();
+        stack.applyComponents(item.getPatch());
+        item.update(stack);
     }
 
     public HItemStack(HItem item, org.bukkit.inventory.ItemStack stack) {
         this.item = item;
         this.stack = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(stack);
         loadDataFromNBT();
+        this.stack.applyComponents(item.getPatch());
+        item.update(stack);
     }
 
-    public ItemStack getStack() {
+    public ItemStack getVanillaStack() {
         return stack;
+    }
+
+    public org.bukkit.inventory.ItemStack getBukkitStack() {
+        return org.bukkit.craftbukkit.inventory.CraftItemStack.asBukkitCopy(stack);
+    }
+
+    public HItem getItem() {
+        return item;
     }
 
     public void setItemLevel(int itemLevel) {
@@ -84,9 +98,18 @@ public class HItemStack {
     }
 
     private void loadDataFromNBT() {
-        CompoundTag tag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getCompound("hephaestus-data");
-        itemLevel = tag.getInt("level");
-        rarity = HRarity.valueOf(tag.getString("rarity").toUpperCase(Locale.ROOT));
+        if (stack.has(DataComponents.CUSTOM_DATA)) {
+            CompoundTag tag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getCompound("hephaestus-data");
+            if (tag.isEmpty()) {
+                return;
+            }
+            itemLevel = tag.getInt("level");
+            rarity = HRarity.valueOf(tag.getString("rarity").toUpperCase(Locale.ROOT));
+        } else {
+            CompoundTag compoundTag = new CompoundTag();
+            compoundTag.putString("hephaestus-id", item.getKey().toString());
+            CustomData.set(DataComponents.CUSTOM_DATA, stack, compoundTag);
+        }
     }
 
     public void saveChanges() {

@@ -14,6 +14,7 @@ import io.papermc.paper.registry.keys.ItemTypeKeys;
 import io.papermc.paper.registry.set.RegistrySet;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
@@ -42,6 +43,20 @@ public class HephaestusBootstrap implements PluginBootstrap {
                                 ctx.getSource().getSender().sendRichMessage("<green>Reloaded Item Library.");
                                 return Command.SINGLE_SUCCESS;
                             }).requires(s -> s.getSender().hasPermission("hephaestus.reload")))
+                    .then(Commands.literal("setblockdata")
+                            .then(Commands.argument("key", ArgumentTypes.namespacedKey())
+                                    .executes(ctx -> {
+                                        Player player = (Player) ctx.getSource().getSender();
+                                        NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
+                                        Block block = player.getTargetBlockExact(32);
+                                        if (block == null) {
+                                            player.sendRichMessage("<red>No block in sight.");
+                                            return -1;
+                                        }
+                                        itemLibrary.runIfPresent(key, item -> item.setBlockData(block.getBlockData()));
+                                        player.sendRichMessage("<green>Set BlockData for <gray>" + key.toString() + "<green> to" + block.getBlockData().getAsString() + "<green>");
+                                        return Command.SINGLE_SUCCESS;
+                                    }).requires(s -> s.getSender().hasPermission("hephaestus.setblockdata"))))
                     .then(Commands.literal("register")
                             .then(Commands.argument("key", ArgumentTypes.namespacedKey())
                                     .executes(ctx -> {
@@ -54,8 +69,18 @@ public class HephaestusBootstrap implements PluginBootstrap {
                                         }
                                         itemLibrary.register(player.getInventory().getItemInMainHand(), key);
                                         ctx.getSource().getSender().sendRichMessage("<green>Registered Item with key <gray>" + key.toString() + "<green>.");
+                                        itemLibrary.save();
                                         return Command.SINGLE_SUCCESS;
                                     }).requires(s -> s.getSender().hasPermission("hephaestus.register"))))
+                    .then(Commands.literal("give")
+                            .then(Commands.argument("key", ArgumentTypes.namespacedKey())
+                                    .executes(ctx -> {
+                                        Player player = (Player) ctx.getSource().getSender();
+                                        NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
+                                        itemLibrary.runIfPresent(key, item -> player.getInventory().addItem(item.rollRandomStack().getBukkitStack()));
+                                        player.sendRichMessage("<green>Gave item <gray>" + key.toString() + "<green>.");
+                                        return Command.SINGLE_SUCCESS;
+                                    }).requires(s -> s.getSender().hasPermission("hephaestus.give"))))
                     .build(), "Main Hephaestus command.", List.of("he", "hp", "h", "hh"));
         });
     }
