@@ -1,7 +1,6 @@
 package de.erethon.hephaestus.items;
 
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
-import com.google.common.collect.ImmutableMap;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import de.erethon.hephaestus.Hephaestus;
@@ -9,26 +8,15 @@ import de.erethon.hephaestus.items.interactions.HItemDropAction;
 import de.erethon.hephaestus.items.interactions.HItemEquipmentChangeAction;
 import de.erethon.hephaestus.items.interactions.HItemInteractAction;
 import de.erethon.hephaestus.utils.HRandom;
-import net.minecraft.SharedConstants;
-import net.minecraft.commands.arguments.item.ItemInput;
-import net.minecraft.commands.arguments.item.ItemParser;
-import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.SnbtPrinterTagVisitor;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.block.data.BlockData;
@@ -37,23 +25,18 @@ import org.bukkit.craftbukkit.CraftRegistry;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-
-import static io.papermc.paper.configuration.Configuration.VERSION_FIELD;
 
 public class HItem {
 
-    private Hephaestus plugin = Hephaestus.INSTANCE;
+    private final Hephaestus plugin = Hephaestus.INSTANCE;
+    private final HItemLibrary library = plugin.getLibrary();
 
     // Basics
     private final File file;
@@ -61,6 +44,9 @@ public class HItem {
     private Item baseItem;
     private DataComponentPatch patch;
     private BlockData blockData = null;
+    private String name;
+    private String description;
+    private final Set<String> allowedUpgrades = new HashSet<>();
 
     // Randomization
     private Map<Integer, Integer> levelWeights = new HashMap<>();
@@ -114,6 +100,7 @@ public class HItem {
 
     public HItemStack rollRandomStack() {
         HItemStack hStack = new HItemStack(this);
+        hStack.update();
         if (levelWeights == null || levelWeights.isEmpty()) {
             return hStack;
         }
@@ -154,25 +141,36 @@ public class HItem {
         return patch;
     }
 
-    public ItemStack update(ItemStack stack) {
-        stack.applyComponents(patch);
-        if (stack.getItem() != baseItem) {
-            stack.setItem(baseItem); // Is there a better way?
-        }
-        CompoundTag compoundTag = new CompoundTag();
-        compoundTag.putString("hephaestus-id", key.toString());
-        CustomData.set(DataComponents.CUSTOM_DATA, stack, compoundTag);
-        return stack;
+    public Set<String> getAllowedUpgrades() {
+        return allowedUpgrades;
     }
 
-    public void update(org.bukkit.inventory.ItemStack stack) {
-        update(org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(stack));
+    public String getNameKey() {
+        return name;
+    }
+
+    public String getDescriptionKey() {
+        return description;
+    }
+
+    public HItemLibrary getLibrary() {
+        return library;
+    }
+
+    public Hephaestus getPlugin() {
+        return plugin;
     }
 
     private void load() {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         key = NamespacedKey.fromString(config.getString("key", "hephaestus:default"));
         baseItem = BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone")));
+        if (config.contains("name")) {
+            name = config.getString("name");
+        }
+        if (config.contains("description")) {
+            description = config.getString("description");
+        }
         if (config.contains("patch")) {
             patch = deserialize(config.getString("patch"));
         }
@@ -203,6 +201,12 @@ public class HItem {
         YamlConfiguration config = new YamlConfiguration();
         config.set("key", key.toString());
         config.set("baseItem", BuiltInRegistries.ITEM.getKey(baseItem).toString());
+        if (name != null) {
+            config.set("name", name);
+        }
+        if (description != null) {
+            config.set("description", description);
+        }
         try {
             if (patch == null) {
                 patch = baseItem.getDefaultInstance().getComponentsPatch();
