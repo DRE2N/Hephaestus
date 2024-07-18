@@ -9,10 +9,13 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+
+import javax.annotation.Nullable;
 
 public class HListener implements Listener {
 
@@ -24,27 +27,46 @@ public class HListener implements Listener {
 
     @EventHandler
     private void onPlayerInventoryLoad(PlayerInventoryLoadEvent event) {
+        Player player = (Player) event.player.getBukkitEntity();
         for (ItemStack item : event.items) {
-            onItemLoad(item);
+            if (item.isEmpty()) {
+                continue;
+            }
+            onItemLoad(item).updateVisuals(player);
         }
         for (ItemStack item : event.armor) {
-            onItemLoad(item);
+            if (item.isEmpty()) {
+                continue;
+            }
+            onItemLoad(item).updateVisuals(player);
         }
         for (ItemStack item : event.offHand) {
-            onItemLoad(item);
+            if (item.isEmpty()) {
+                continue;
+            }
+            onItemLoad(item).updateVisuals(player);
         }
     }
 
     @EventHandler
     private void onContainerLoad(ContainerLoadEvent event){
         for (ItemStack item : event.stacks) {
+            if (item.isEmpty()) {
+                continue;
+            }
             onItemLoad(item);
         }
     }
 
     @EventHandler
     private void onPickup(EntityPickupItemEvent event) {
-        onItemLoad(ItemStack.fromBukkitCopy(event.getItem().getItemStack()));
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        if (event.getItem().getItemStack().getType() == org.bukkit.Material.AIR) {
+            return;
+        }
+        onItemLoad(event.getItem().getItemStack()).updateVisuals(player);
     }
 
     @EventHandler
@@ -56,16 +78,12 @@ public class HListener implements Listener {
         stack.getItem().runDropActions(stack, event);
     }
 
-    private void onItemLoad(ItemStack item) {
-        NamespacedKey key;
-        if (!item.has(DataComponents.CUSTOM_DATA)) {
-            key = NamespacedKey.fromString(BuiltInRegistries.ITEM.getKey(item.getItem()).toString());
-            plugin.getLibrary().runIfPresent(key, i -> i.update(item));
-            return;
-        }
-        CompoundTag tag = item.get(DataComponents.CUSTOM_DATA).copyTag();
-        key = NamespacedKey.fromString(tag.getString("hephaestus-id"));
-        plugin.getLibrary().runIfPresent(key, i -> i.update(item));
+    private HItemStack onItemLoad(ItemStack item) {
+        return HItemStack.getFromStack(item).update();
+    }
+
+    private HItemStack onItemLoad(org.bukkit.inventory.ItemStack item) {
+        return HItemStack.getFromStack(item).update();
     }
 
 }
