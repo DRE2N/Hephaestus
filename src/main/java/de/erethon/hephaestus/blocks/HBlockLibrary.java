@@ -70,7 +70,7 @@ public class HBlockLibrary implements Listener {
                 if (!newBlock.getType().isAir() || player.getWorld().hasCollisionsIn(player.getBoundingBox())) {
                     return;
                 }
-                newBlock.setType(Material.DIAMOND_BLOCK);
+                newBlock.setType(hItem.getBlockData().getMaterial());
                 newBlock.setBlockData(getBlockData(hItem));
             }
             player.swingHand(event.getHand());
