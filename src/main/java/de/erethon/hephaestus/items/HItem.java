@@ -16,14 +16,18 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.item.Item;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
+import org.bukkit.Sound;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.CraftRegistry;
+import org.bukkit.craftbukkit.CraftSound;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,6 +48,7 @@ public class HItem {
     private Item baseItem;
     private DataComponentPatch patch;
     private BlockData blockData = null;
+    private SoundEvent placementSound = null;
     private String name;
     private String description;
     private final Set<String> allowedUpgrades = new HashSet<>();
@@ -137,6 +142,13 @@ public class HItem {
         plugin.getBlockLibrary().register(this, blockData);
     }
 
+    public @NotNull Sound getPlacementSound() {
+        if (placementSound == null) {
+            return Sound.BLOCK_STONE_PLACE;
+        }
+        return CraftSound.minecraftToBukkit(placementSound);
+    }
+
     public DataComponentPatch getPatch() {
         return patch;
     }
@@ -178,6 +190,9 @@ public class HItem {
         if (config.contains("placedBlockData")) {
             blockData = Bukkit.getServer().createBlockData(config.getString("placedBlockData"));
             plugin.getBlockLibrary().register(this, blockData);
+        }
+        if (config.contains("placementSound")) {
+            placementSound = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.parse(config.getString("placementSound", "minecraft:block.stone.place")));
         }
         levelWeights = HRandom.loadWeights(config, "random.level");
         // Load level-specific rarity and slot weights

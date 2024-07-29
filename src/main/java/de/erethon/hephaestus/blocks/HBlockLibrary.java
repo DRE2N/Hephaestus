@@ -74,6 +74,7 @@ public class HBlockLibrary implements Listener {
                 newBlock.setBlockData(getBlockData(hItem));
             }
             player.swingHand(event.getHand());
+            player.playSound(clickedBlock.getLocation(), hItem.getPlacementSound(), 1, 1);
             if (player.getGameMode() != GameMode.CREATIVE) {
                 item.setAmount(item.getAmount() - 1);
             }
