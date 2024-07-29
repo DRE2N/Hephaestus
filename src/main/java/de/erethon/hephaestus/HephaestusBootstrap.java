@@ -64,7 +64,11 @@ public class HephaestusBootstrap implements PluginBootstrap {
                             itemLibrary.runIfPresent(key, item -> item.setBlockData(block.getBlockData()));
                             player.sendRichMessage("<green>Set BlockData for <gray>" + key.toString() + "<green> to" + block.getBlockData().getAsString() + "<green>");
                             return Command.SINGLE_SUCCESS;
-                    }).requires(s -> s.getSender().hasPermission("hephaestus.setblockdata"))))
+                    }).requires(s -> s.getSender().hasPermission("hephaestus.setblockdata"))
+                    .suggests((ctx, builder) -> {
+                            itemLibrary.getKeys().forEach(key -> builder.suggest(key.toString()));
+                            return builder.buildFuture();
+                    })))
                 .then(Commands.literal("register")
                     .then(Commands.argument("key", ArgumentTypes.namespacedKey())
                         .executes(ctx -> {
