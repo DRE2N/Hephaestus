@@ -1,10 +1,9 @@
 package de.erethon.hephaestus;
 
-import de.erethon.hephaestus.items.HBlockLibrary;
+import de.erethon.hephaestus.blocks.HBlockLibrary;
 import de.erethon.hephaestus.items.HItemLibrary;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.listeners.HListener;
-import net.kyori.adventure.translation.GlobalTranslator;
 import net.kyori.adventure.translation.Translator;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
@@ -12,9 +11,6 @@ import net.minecraft.world.item.ItemStack;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import javax.annotation.Nullable;
-import java.util.Locale;
 
 public final class Hephaestus extends JavaPlugin {
 
