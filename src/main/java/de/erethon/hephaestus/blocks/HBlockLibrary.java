@@ -54,6 +54,9 @@ public class HBlockLibrary implements Listener {
 
         if (event.hasItem()) {
             ItemStack item = event.getItem();
+            if (item != null && !item.getType().isItem()) {
+                return;
+            }
             HItem hItem = Hephaestus.getStack(item).getItem();
             if (event.getClickedBlock() == null || hItem.getBlockData() == null) {
                 return;
