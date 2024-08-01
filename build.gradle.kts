@@ -14,7 +14,7 @@ plugins {
     id("xyz.jpenilla.run-paper") version "1.0.6" // Adds runServer and runMojangMappedServer tasks for testing
 }
 
-group = "de.erethon"
+group = "de.erethon.hephaestus"
 version = "1.0-SNAPSHOT"
 description = "Items"
 
@@ -26,6 +26,17 @@ val papyrusVersion = "1.21-R0.1-SNAPSHOT"
 
 dependencies {
     paperweight.devBundle("de.erethon.papyrus", papyrusVersion) { isChanging = true}
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "${project.group}"
+            artifactId = "Hephaestus"
+            version = "${project.version}"
+            from(components["java"])
+        }
+    }
 }
 
 tasks {
