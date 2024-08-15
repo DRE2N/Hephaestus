@@ -20,6 +20,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
@@ -71,6 +72,11 @@ public class HBlockLibrary implements Listener {
                 Block newBlock = clickedBlock.getWorld().getBlockAt(event.getClickedBlock().getLocation().add(face.getDirection()));
                 // TODO: Need to make up-stacking less laggy and suffocating
                 if (!newBlock.getType().isAir() || player.getWorld().hasCollisionsIn(player.getBoundingBox())) {
+                    return;
+                }
+                // Would collide using the block
+                BoundingBox box = newBlock.getBoundingBox();
+                if (box.overlaps(player.getBoundingBox())) {
                     return;
                 }
                 newBlock.setType(hItem.getBlockData().getMaterial());
