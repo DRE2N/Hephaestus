@@ -1,5 +1,6 @@
 package de.erethon.hephaestus.items.upgrades;
 
+import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.utils.HRandom;
 import net.kyori.adventure.text.Component;
@@ -11,33 +12,35 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlotGroup;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.craftbukkit.attribute.CraftAttribute;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class HAttributeModifyingUpgrade extends HItemUpgrade {
 
-    private final Map<Attribute, Map<Integer, Map<Double, Integer>>> attributeModifiers = new HashMap<>();
+    private final Map<Holder<Attribute>, Map<Integer, Map<Double, Integer>>> attributeModifiers = new HashMap<>();
 
     public HAttributeModifyingUpgrade() {
     }
 
     @Override
     public HRolledUpgrade roll(HItemStack stack) {
-        super.roll(stack);
         int itemLevel = stack.getItemLevel();
         CompoundTag valueTag = new CompoundTag();
-        for (Map.Entry<Attribute, Map<Integer, Map<Double, Integer>>> entry : attributeModifiers.entrySet()) {
+        for (Map.Entry<Holder<Attribute>, Map<Integer, Map<Double, Integer>>> entry : attributeModifiers.entrySet()) {
             Map<Double, Integer> levelModifiers = entry.getValue().get(itemLevel);
             if (levelModifiers != null) {
                 double value = HRandom.selectWeightedRandomValue(levelModifiers);
-                stack.getVanillaStack().get(DataComponents.ATTRIBUTE_MODIFIERS).modifiers()
-                        .add(new ItemAttributeModifiers.Entry((Holder<Attribute>) entry.getKey(), new AttributeModifier(ResourceLocation.parse("hephaestus:" + id),
-                                value, AttributeModifier.Operation.ADD_VALUE), EquipmentSlotGroup.ANY));
+                AttributeModifier modifier = new AttributeModifier(ResourceLocation.parse("hephaestus:" + id), value, AttributeModifier.Operation.ADD_VALUE);
+                ItemAttributeModifiers.builder().add(entry.getKey(), modifier, EquipmentSlotGroup.ANY).build();
                 valueTag.putDouble(id, value);
             }
         }
@@ -51,10 +54,15 @@ public class HAttributeModifyingUpgrade extends HItemUpgrade {
             return config;
         }
         for (String key : config.getConfigurationSection("attributes").getKeys(false)) {
-            Attribute attribute = BuiltInRegistries.ATTRIBUTE.get(ResourceLocation.parse("minecraft:" + key));
-            if (attribute == null) {
+            org.bukkit.attribute.Attribute bukkitAttribute;
+            try {
+                bukkitAttribute = org.bukkit.attribute.Attribute.valueOf(key.toUpperCase(Locale.ROOT));
+            }
+            catch (IllegalArgumentException e) {
+                Hephaestus.INSTANCE.getLogger().warning("Invalid attribute key: " + key + " in " + file.getName());
                 continue;
             }
+            Holder<Attribute> attribute = CraftAttribute.bukkitToMinecraftHolder(bukkitAttribute);
             Map<Integer, Map<Double, Integer>> levelModifiers = new HashMap<>();
             var attributeSection = config.getConfigurationSection("attributes." + key);
             for (String levelKey : attributeSection.getKeys(false)) {
@@ -66,8 +74,4 @@ public class HAttributeModifyingUpgrade extends HItemUpgrade {
         return config;
     }
 
-    @Override
-    public List<Component> getLore() {
-        return null;
-    }
 }

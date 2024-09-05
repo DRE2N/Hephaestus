@@ -3,6 +3,7 @@ package de.erethon.hephaestus.items.upgrades;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.utils.HLoreEntry;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.minecraft.nbt.CompoundTag;
 
 import javax.annotation.Nullable;
@@ -41,8 +42,9 @@ public class HRolledUpgrade implements HLoreEntry {
     }
 
     @Override
-    public List<Component> getLore() {
-        return List.of();
+    public Component getLoreLine() {
+        Component c = Component.text("+", NamedTextColor.GREEN);
+        return Component.translatable("hephaestus.upgrade." + upgrade.getId() + ".name");
     }
 
     public CompoundTag toNBT() {

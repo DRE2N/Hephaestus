@@ -20,11 +20,29 @@ public class HRandom {
         } else {
             List<Map<?, ?>> items = config.getMapList(path);
             for (Map<?, ?> item : items) {
-                int min = (Integer) item.get("min");
-                int max = (Integer) item.get("max");
+                double min, max;
+                boolean isInt;
+                if (item.get("min") instanceof Integer) {
+                    min = (Integer) item.get("min");
+                    isInt = true;
+                } else {
+                    min = (double) item.get("min");
+                    isInt = false;
+                }
+                if (item.get("max") instanceof Integer) {
+                    max = (Integer) item.get("max");
+                } else {
+                    max = (double) item.get("max");
+                }
                 int weight = (Integer) item.get("weight");
-                for (int i = min; i <= max; i++) {
-                    weights.put((T) Integer.valueOf(i), weight);
+                if (isInt) {
+                    for (int i = (int) min; i <= (int) max; i++) {
+                        weights.put((T) Integer.valueOf(i), weight);
+                    }
+                } else {
+                    for (double i = min; i <= max; i++) {
+                        weights.put((T) Double.valueOf(i), weight);
+                    }
                 }
             }
         }
