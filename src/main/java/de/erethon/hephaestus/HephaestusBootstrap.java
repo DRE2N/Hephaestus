@@ -2,7 +2,12 @@ package de.erethon.hephaestus;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import de.erethon.hephaestus.items.HItemLibrary;
+import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
+import de.erethon.hephaestus.items.upgrades.HRolledUpgrade;
+import de.erethon.hephaestus.utils.HUpgradeResult;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.VanillaArgumentProviderImpl;
@@ -18,6 +23,7 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import io.papermc.paper.registry.event.RegistryEvents;
 import io.papermc.paper.registry.keys.ItemTypeKeys;
 import io.papermc.paper.registry.set.RegistrySet;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.commands.GiveCommand;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -50,7 +56,8 @@ public class HephaestusBootstrap implements PluginBootstrap {
                                 itemLibrary.reload();
                                 ctx.getSource().getSender().sendRichMessage("<green>Reloaded Item Library.");
                                 return Command.SINGLE_SUCCESS;
-                            }).requires(s -> s.getSender().hasPermission("hephaestus.reload")))
+                            }).requires(s -> s.getSender().hasPermission("hephaestus.reload"))
+                    )
                     .then(Commands.literal("setblockdata")
                             .then(Commands.argument("key", ArgumentTypes.namespacedKey())
                                     .executes(ctx -> {
@@ -68,7 +75,35 @@ public class HephaestusBootstrap implements PluginBootstrap {
                                     .suggests((ctx, builder) -> {
                                         itemLibrary.getKeys().forEach(key -> builder.suggest(key.toString()));
                                         return builder.buildFuture();
-                                    })))
+                                    })
+                            )
+                    )
+                    .then(Commands.literal("upgrade")
+                            .then(Commands.argument("id", StringArgumentType.greedyString())
+                                    .executes(ctx -> {
+                                        ctx.getSource().getSender().sendRichMessage("<gray><i>Upgrading Item in hand...");
+                                        Player player = (Player) ctx.getSource().getSender();
+                                        ItemStack stack = player.getInventory().getItemInMainHand();
+                                        if (stack.getType() == Material.AIR) {
+                                            player.sendRichMessage("<red>No item in hand.");
+                                            return -1;
+                                        }
+                                        String id = ctx.getArgument("id", String.class);
+                                        HItemUpgrade upgrade = itemLibrary.getUpgrade(id);
+                                        if (upgrade == null) {
+                                            player.sendRichMessage("<red>Upgrade not found.");
+                                            return -1;
+                                        }
+                                        HUpgradeResult result = HItemStack.getFromStack(stack).rollAndAddUpgrade(id);
+                                        ctx.getSource().getSender().sendRichMessage("<green>Result: <gray>" + result.toString());
+                                        return Command.SINGLE_SUCCESS;
+                                    }).requires(s -> s.getSender().hasPermission("hephaestus.upgrade"))
+                                    .suggests((ctx, builder) -> {
+                                        itemLibrary.getUpgradeKeys().forEach(builder::suggest);
+                                        return builder.buildFuture();
+                                    })
+                            )
+                    )
                     .then(Commands.literal("register")
                             .then(Commands.argument("key", ArgumentTypes.namespacedKey())
                                     .executes(ctx -> {
@@ -87,43 +122,46 @@ public class HephaestusBootstrap implements PluginBootstrap {
                             )
                     )
                     .build(), "Main Hephaestus command.", List.of("he", "hp", "h", "hh"));
-            commands.register(Commands.literal("give")
-                    .then(Commands.argument("key", ArgumentTypes.namespacedKey())
-                            .executes(ctx -> {
-                                Player player = (Player) ctx.getSource().getSender();
-                                NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
-                                itemLibrary.runIfPresent(key, item -> player.getInventory().addItem(item.rollRandomStack().getBukkitStack()));
-                                player.sendRichMessage("<green>Gave item <gray>" + key.toString() + "<green>.");
-                                return Command.SINGLE_SUCCESS;
-                            })
-                            .then(Commands.argument("player", ArgumentTypes.player())
-                                    .executes(ctx -> {
-                                        Player targetPlayer = ctx.getArgument("player", PlayerSelectorArgumentResolver.class).resolve(ctx.getSource()).getFirst();
-                                        NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
-                                        itemLibrary.runIfPresent(key, item -> targetPlayer.getInventory().addItem(item.rollRandomStack().getBukkitStack()));
-                                        ctx.getSource().getSender().sendRichMessage("<green>Gave item <gray>" + key.toString() + "<green> to " + targetPlayer.getName() + ".");
-                                        return Command.SINGLE_SUCCESS;
-                                    })
-                                    .then(Commands.argument("count", IntegerArgumentType.integer())
-                                            .executes(ctx -> {
-                                                Player targetPlayer = ctx.getArgument("player", PlayerSelectorArgumentResolver.class).resolve(ctx.getSource()).getFirst();
-                                                NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
-                                                int count = ctx.getArgument("count", Integer.class);
-                                                itemLibrary.runIfPresent(key, item -> {
-                                                    ItemStack stack = item.rollRandomStack().getBukkitStack();
-                                                    stack.setAmount(Math.min(stack.getMaxStackSize(), count));
-                                                    targetPlayer.getInventory().addItem(stack);
-                                                });
-                                                ctx.getSource().getSender().sendRichMessage(String.format("<green>Gave %d of item <gray>%s <green>to %s.", count, key.toString(), targetPlayer.getName()));
-                                                return Command.SINGLE_SUCCESS;
-                                            })
-                                    )
-                            )
-                            .suggests((ctx, builder) -> {
-                                itemLibrary.getKeys().forEach(key -> builder.suggest(key.toString()));
-                                return builder.buildFuture();
-                            })
-                            .requires(s -> s.getSender().hasPermission("hephaestus.give")))
+
+
+
+                    commands.register(Commands.literal("give")
+                        .then(Commands.argument("key", ArgumentTypes.namespacedKey())
+                                .executes(ctx -> {
+                                    Player player = (Player) ctx.getSource().getSender();
+                                    NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
+                                    itemLibrary.runIfPresent(key, item -> player.getInventory().addItem(item.rollRandomStack().getBukkitStack()));
+                                    player.sendRichMessage("<green>Gave item <gray>" + key.toString() + "<green>.");
+                                    return Command.SINGLE_SUCCESS;
+                                })
+                                .then(Commands.argument("player", ArgumentTypes.player())
+                                        .executes(ctx -> {
+                                            Player targetPlayer = ctx.getArgument("player", PlayerSelectorArgumentResolver.class).resolve(ctx.getSource()).getFirst();
+                                            NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
+                                            itemLibrary.runIfPresent(key, item -> targetPlayer.getInventory().addItem(item.rollRandomStack().getBukkitStack()));
+                                            ctx.getSource().getSender().sendRichMessage("<green>Gave item <gray>" + key.toString() + "<green> to " + targetPlayer.getName() + ".");
+                                            return Command.SINGLE_SUCCESS;
+                                        })
+                                        .then(Commands.argument("count", IntegerArgumentType.integer())
+                                                .executes(ctx -> {
+                                                    Player targetPlayer = ctx.getArgument("player", PlayerSelectorArgumentResolver.class).resolve(ctx.getSource()).getFirst();
+                                                    NamespacedKey key = ctx.getArgument("key", NamespacedKey.class);
+                                                    int count = ctx.getArgument("count", Integer.class);
+                                                    itemLibrary.runIfPresent(key, item -> {
+                                                        ItemStack stack = item.rollRandomStack().getBukkitStack();
+                                                        stack.setAmount(Math.min(stack.getMaxStackSize(), count));
+                                                        targetPlayer.getInventory().addItem(stack);
+                                                    });
+                                                    ctx.getSource().getSender().sendRichMessage(String.format("<green>Gave %d of item <gray>%s <green>to %s.", count, key.toString(), targetPlayer.getName()));
+                                                    return Command.SINGLE_SUCCESS;
+                                                })
+                                        )
+                                )
+                                .suggests((ctx, builder) -> {
+                                    itemLibrary.getKeys().forEach(key -> builder.suggest(key.toString()));
+                                    return builder.buildFuture();
+                                })
+                                .requires(s -> s.getSender().hasPermission("hephaestus.give")))
                     .build(), "Give an item to a player.", List.of("i", "g"));
         });
     }

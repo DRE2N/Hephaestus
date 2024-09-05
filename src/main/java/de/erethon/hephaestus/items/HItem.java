@@ -22,6 +22,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.CraftRegistry;
 import org.bukkit.craftbukkit.CraftSound;
@@ -44,13 +45,11 @@ public class HItem {
 
     // Basics
     private final File file;
-    private NamespacedKey key;
+    private ResourceLocation key;
     private Item baseItem;
     private DataComponentPatch patch;
     private BlockData blockData = null;
     private SoundEvent placementSound = null;
-    private String name;
-    private String description;
     private final Set<String> allowedUpgrades = new HashSet<>();
 
     // Randomization
@@ -68,11 +67,11 @@ public class HItem {
         load();
     }
 
-    public HItem(NamespacedKey key, File file) {
+    public HItem(ResourceLocation key, File file) {
         this.file = file;
     }
 
-    public HItem(NamespacedKey key, Item baseItem, DataComponentPatch patch) {
+    public HItem(ResourceLocation key, Item baseItem, DataComponentPatch patch) {
         this.key = key;
         this.baseItem = baseItem;
         this.patch = patch;
@@ -106,11 +105,12 @@ public class HItem {
     public HItemStack rollRandomStack() {
         HItemStack hStack = new HItemStack(this);
         hStack.update();
-        if (levelWeights == null || levelWeights.isEmpty()) {
-            return hStack;
+
+        int itemLevel = 0;
+        if (levelWeights != null && !levelWeights.isEmpty()) {
+            itemLevel = HRandom.selectWeightedRandomValue(levelWeights);
+            hStack.setItemLevel(itemLevel);
         }
-        int itemLevel = HRandom.selectWeightedRandomValue(levelWeights);
-        hStack.setItemLevel(itemLevel);
 
         Map<String, Integer> rarityWeightsForLevel = rarityWeights.getOrDefault(itemLevel, new HashMap<>());
         if (!rarityWeightsForLevel.isEmpty()) {
@@ -125,8 +125,12 @@ public class HItem {
         return hStack;
     }
 
-    public NamespacedKey getKey() {
+    public ResourceLocation getKey() {
         return key;
+    }
+
+    public NamespacedKey getBukkitKey() {
+        return new NamespacedKey(key.getNamespace(), key.getPath());
     }
 
     public Item getBaseItem() {
@@ -157,14 +161,6 @@ public class HItem {
         return allowedUpgrades;
     }
 
-    public String getNameKey() {
-        return name;
-    }
-
-    public String getDescriptionKey() {
-        return description;
-    }
-
     public HItemLibrary getLibrary() {
         return library;
     }
@@ -173,16 +169,45 @@ public class HItem {
         return plugin;
     }
 
+    public boolean isVanilla() {
+        return key.getNamespace().equals("minecraft");
+    }
+
     private void load() {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        key = NamespacedKey.fromString(config.getString("key", "hephaestus:default"));
+        key = ResourceLocation.parse(config.getString("key", "hephaestus:default"));
         baseItem = BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone")));
         if (config.contains("name")) {
-            name = config.getString("name");
+            ConfigurationSection nameSection = config.getConfigurationSection("name");
+            if (nameSection != null) {
+                for (String key : nameSection.getKeys(false)) {
+                    Locale locale;
+                    if (key.contains("de")) {
+                        locale = Locale.GERMANY;
+                    } else {
+                        locale = Locale.US;
+                    }
+                    String id =  this.key.toString().replace(":", ".");
+                    plugin.registerTranslation("hephaestus.item." + id + ".name", locale, config.getString("name." + key));
+                }
+            }
         }
-        if (config.contains("description")) {
-            description = config.getString("description");
+        if (config.contains("flavour")) {
+            ConfigurationSection descriptionSection = config.getConfigurationSection("flavour");
+            if (descriptionSection != null) {
+                for (String key : descriptionSection.getKeys(false)) {
+                    Locale locale;
+                    if (key.contains("de")) {
+                        locale = Locale.GERMANY;
+                    } else {
+                        locale = Locale.US;
+                    }
+                    String id =  this.key.toString().replace(":", ".");
+                    plugin.registerTranslation("hephaestus.item." + id + ".flavour", locale, config.getString("flavour." + key));
+                }
+            }
         }
+
         if (config.contains("patch")) {
             patch = deserialize(config.getString("patch"));
         }
@@ -216,12 +241,6 @@ public class HItem {
         YamlConfiguration config = new YamlConfiguration();
         config.set("key", key.toString());
         config.set("baseItem", BuiltInRegistries.ITEM.getKey(baseItem).toString());
-        if (name != null) {
-            config.set("name", name);
-        }
-        if (description != null) {
-            config.set("description", description);
-        }
         try {
             if (patch == null) {
                 patch = baseItem.getDefaultInstance().getComponentsPatch();

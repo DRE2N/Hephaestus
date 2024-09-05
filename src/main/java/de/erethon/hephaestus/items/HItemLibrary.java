@@ -5,6 +5,7 @@ import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
 import de.erethon.hephaestus.utils.HLibraryAction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 
@@ -17,7 +18,7 @@ public class HItemLibrary {
 
     private final File itemDataDirectory;
     private final File upgradeDataDirectory;
-    private final HashMap<NamespacedKey, HItem> items = new HashMap<>();
+    private final HashMap<ResourceLocation, HItem> items = new HashMap<>();
     private final HashMap<String, HItemUpgrade> upgrades = new HashMap<>();
 
     public HItemLibrary(File itemFile, File upgradeFile) {
@@ -28,19 +29,23 @@ public class HItemLibrary {
     // Items
 
     public HItem get(NamespacedKey key) {
+        return items.get(ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
+    }
+
+    public HItem get(ResourceLocation key) {
         return items.get(key);
     }
 
     public HItemStack get(net.minecraft.world.item.ItemStack stack) {
         if (!stack.has(DataComponents.CUSTOM_DATA)) {
-            HItem item = items.get(NamespacedKey.fromString(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()));
+            HItem item = items.get(BuiltInRegistries.ITEM.getKey(stack.getItem()));
             if (item == null) {
                 return null;
             }
             return new HItemStack(item, stack);
         }
         String id = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getString("hephaestus-id");
-        HItem item = items.get(NamespacedKey.fromString(id));
+        HItem item = items.get(ResourceLocation.parse(id));
         return new HItemStack(item, stack);
     }
 
@@ -49,6 +54,14 @@ public class HItemLibrary {
     }
 
     public void runIfPresent(NamespacedKey key, HLibraryAction action) {
+        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey());
+        HItem item = items.get(loc);
+        if (item != null) {
+            action.execute(item);
+        }
+    }
+
+    public void runIfPresent(ResourceLocation key, HLibraryAction action) {
         HItem item = items.get(key);
         if (item != null) {
             action.execute(item);
@@ -56,10 +69,14 @@ public class HItemLibrary {
     }
 
     public boolean has(NamespacedKey key) {
+        return items.containsKey(ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
+    }
+
+    public boolean has(ResourceLocation key) {
         return items.containsKey(key);
     }
 
-    public List<NamespacedKey> getKeys() {
+    public List<ResourceLocation> getKeys() {
         return new ArrayList<>(items.keySet());
     }
 
@@ -73,14 +90,18 @@ public class HItemLibrary {
         upgrades.put(upgrade.getId(), upgrade);
     }
 
+    public List<String> getUpgradeKeys() {
+        return new ArrayList<>(upgrades.keySet());
+    }
+
     // Registration
 
     public void register(ItemStack item, NamespacedKey key){
         net.minecraft.world.item.ItemStack nmsItem = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(item);
-        register(nmsItem, key);
+        register(nmsItem, ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
     }
 
-    public void register(net.minecraft.world.item.ItemStack item, NamespacedKey key) {
+    public void register(net.minecraft.world.item.ItemStack item, ResourceLocation key) {
         HItem hItem = new HItem(key, item.getItem(), item.getComponentsPatch());
         items.put(key, hItem);
     }
@@ -89,12 +110,15 @@ public class HItemLibrary {
 
     public void reload() {
         items.clear();
+        upgrades.clear();
         load();
     }
 
     public void load() {
         loadFilesForDirectory(itemDataDirectory);
+        Hephaestus.INSTANCE.getLogger().info("Loaded " + items.size() + " items.");
         loadFilesForDirectory(upgradeDataDirectory);
+        Hephaestus.INSTANCE.getLogger().info("Loaded " + upgrades.size() + " upgrades.");
     }
 
     public void save() {
@@ -124,7 +148,11 @@ public class HItemLibrary {
                 }
             }
             if (file.getName().endsWith(".yml") && isUpgradeDirectory) {
-                HItemUpgrade upgrade = new HItemUpgrade();
+                HItemUpgrade upgrade = HItemUpgrade.createInstance(file);
+                if (upgrade == null) {
+                    Hephaestus.INSTANCE.getLogger().warning("Failed to load upgrade " + file.getName());
+                    continue;
+                }
                 try {
                     upgrade.load(file);
                     upgrades.put(upgrade.getId(), upgrade);
@@ -149,7 +177,8 @@ public class HItemLibrary {
             return;
         }
         for (HItem item : items.values()) {
-            File file = new File(directory, item.getKey().getKey() + ".yml");
+            File subDirectory = new File(directory, item.getKey().getNamespace());
+            File file = new File(subDirectory, item.getKey().getPath() + ".yml");
             item.save(file);
         }
     }

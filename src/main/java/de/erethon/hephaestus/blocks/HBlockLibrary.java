@@ -2,10 +2,7 @@ package de.erethon.hephaestus.blocks;
 
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItem;
-import io.papermc.paper.event.player.PlayerArmSwingEvent;
 import org.bukkit.GameMode;
-import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
@@ -14,14 +11,11 @@ import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.block.BlockCanBuildEvent;
 import org.bukkit.event.block.BlockDropItemEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
-import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.Map;
