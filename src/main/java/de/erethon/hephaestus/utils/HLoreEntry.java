@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface HLoreEntry {
 
-    List<Component> getLore();
+    Component getLoreLine();
 }
