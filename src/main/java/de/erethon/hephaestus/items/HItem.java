@@ -1,13 +1,20 @@
 package de.erethon.hephaestus.items;
 
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.JsonOps;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.interactions.HItemDropAction;
 import de.erethon.hephaestus.items.interactions.HItemEquipmentChangeAction;
 import de.erethon.hephaestus.items.interactions.HItemInteractAction;
 import de.erethon.hephaestus.utils.HRandom;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.NbtOps;
@@ -16,7 +23,9 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.item.Item;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -176,7 +185,11 @@ public class HItem {
     private void load() {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         key = ResourceLocation.parse(config.getString("key", "hephaestus:default"));
-        baseItem = BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone")));
+        if (BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone"))).isPresent()) {
+            baseItem = BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone"))).get().value();
+        } else {
+            throw new RuntimeException("Base item not found: " + config.getString("baseItem"));
+        }
         if (config.contains("name")) {
             ConfigurationSection nameSection = config.getConfigurationSection("name");
             if (nameSection != null) {
@@ -217,7 +230,7 @@ public class HItem {
             plugin.getBlockLibrary().register(this, blockData);
         }
         if (config.contains("placementSound")) {
-            placementSound = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.parse(config.getString("placementSound", "minecraft:block.stone.place")));
+            placementSound = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.parse(config.getString("placementSound", "minecraft:block.stone.place"))).get().value();
         }
         levelWeights = HRandom.loadWeights(config, "random.level");
         // Load level-specific rarity and slot weights
@@ -267,21 +280,19 @@ public class HItem {
     }
 
     public static String serialize(DataComponentPatch patch) {
-        RegistryOps<Tag> ops = CraftRegistry.getMinecraftRegistry().createSerializationContext(NbtOps.INSTANCE);
-        final Tag tag = DataComponentPatch.CODEC.encodeStart(ops, patch).getOrThrow();
-        return new SnbtPrinterTagVisitor().visit(tag);
+        RegistryOps<JsonElement> ops = CraftRegistry.getMinecraftRegistry().createSerializationContext(JsonOps.INSTANCE);
+        JsonObject tag = DataComponentPatch.CODEC.encodeStart(ops, patch).getOrThrow().getAsJsonObject();
+        tag.addProperty("DataVersion", SharedConstants.getCurrentVersion().getDataVersion().getVersion());
+        return tag.toString();
    }
 
     public static DataComponentPatch deserialize(String string) {
-        RegistryOps<Tag> ops = CraftRegistry.getMinecraftRegistry().createSerializationContext(NbtOps.INSTANCE);
-        TagParser parser = new TagParser(new StringReader(string));
-        DataComponentPatch patch = null;
-        try {
-            patch = DataComponentPatch.CODEC.parse(ops, parser.readValue()).getOrThrow();
-        } catch (CommandSyntaxException e) {
-            throw new RuntimeException(e);
-        }
-        return patch;
+        JsonObject element = JsonParser.parseString(string).getAsJsonObject();
+        int dataVersion = element.get("DataVersion").getAsInt();
+        int currentVersion = SharedConstants.getCurrentVersion().getDataVersion().getVersion();
+        element = (JsonObject) MinecraftServer.getServer().fixerUpper.update(References.ITEM_STACK, new Dynamic(JsonOps.INSTANCE, element), dataVersion, currentVersion).getValue();
+        RegistryOps<JsonElement> ops = CraftRegistry.getMinecraftRegistry().createSerializationContext(JsonOps.INSTANCE);
+        return DataComponentPatch.CODEC.decode(ops, element).getOrThrow().getFirst();
     }
 
 }
