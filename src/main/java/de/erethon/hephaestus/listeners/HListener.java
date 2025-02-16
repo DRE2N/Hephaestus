@@ -2,8 +2,8 @@ package de.erethon.hephaestus.listeners;
 
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItemStack;
-import de.erethon.papyrus.ContainerLoadEvent;
-import de.erethon.papyrus.PlayerInventoryLoadEvent;
+import de.erethon.papyrus.events.ContainerLoadEvent;
+import de.erethon.papyrus.events.PlayerInventoryLoadEvent;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;

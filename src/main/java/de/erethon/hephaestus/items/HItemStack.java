@@ -211,7 +211,7 @@ public class HItemStack {
         saveUpgradesInTag(upgradesTag);
         tag.put("upgrades", upgradesTag);
         customData.put("hephaestus-data", tag);
-        CustomData.set(DataComponents.CUSTOM_DATA, stack, customData);
+        CustomData.set(DataComponents.CUSTOM_DATA, stack, customData); // seems broken
     }
 
     private void saveUpgradesInTag(CompoundTag tag) {

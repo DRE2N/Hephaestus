@@ -14,6 +14,8 @@ import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.attribute.CraftAttribute;
 
@@ -56,7 +58,7 @@ public class HAttributeModifyingUpgrade extends HItemUpgrade {
         for (String key : config.getConfigurationSection("attributes").getKeys(false)) {
             org.bukkit.attribute.Attribute bukkitAttribute;
             try {
-                bukkitAttribute = org.bukkit.attribute.Attribute.valueOf(key.toUpperCase(Locale.ROOT));
+                bukkitAttribute = Registry.ATTRIBUTE.get(new NamespacedKey("minecraft", key.toLowerCase()));
             }
             catch (IllegalArgumentException e) {
                 Hephaestus.INSTANCE.getLogger().warning("Invalid attribute key: " + key + " in " + file.getName());
