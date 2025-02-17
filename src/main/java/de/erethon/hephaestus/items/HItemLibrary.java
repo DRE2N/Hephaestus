@@ -131,6 +131,7 @@ public class HItemLibrary {
             return;
         }
         boolean isUpgradeDirectory = directory.equals(upgradeDataDirectory);
+        Hephaestus.INSTANCE.getLogger().info("Loading " + directory.getName());
         for (File file : directory.listFiles()) {
             if (file.isDirectory()) {
                 loadFilesForDirectory(file);

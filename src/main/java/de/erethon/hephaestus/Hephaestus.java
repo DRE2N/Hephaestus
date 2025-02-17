@@ -78,6 +78,7 @@ public final class Hephaestus extends JavaPlugin {
 
 
     private void generateDefaultItems() {
+        getLogger().info("Generating default items... This may take a while.");
         int count = 0;
         for (Item item : BuiltInRegistries.ITEM.stream().toList()) {
             itemLibrary.register(new ItemStack(item), BuiltInRegistries.ITEM.getKey(item));
