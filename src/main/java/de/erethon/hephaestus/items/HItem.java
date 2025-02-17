@@ -1,12 +1,12 @@
 package de.erethon.hephaestus.items;
 
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.stream.JsonReader;
-import com.mojang.brigadier.StringReader;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.JsonOps;
 import de.erethon.hephaestus.Hephaestus;
@@ -15,18 +15,21 @@ import de.erethon.hephaestus.items.interactions.HItemEquipmentChangeAction;
 import de.erethon.hephaestus.items.interactions.HItemInteractAction;
 import de.erethon.hephaestus.utils.HRandom;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.PatchedDataComponentMap;
+import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.SnbtPrinterTagVisitor;
-import net.minecraft.nbt.Tag;
-import net.minecraft.nbt.TagParser;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
@@ -43,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -222,7 +226,12 @@ public class HItem {
         }
 
         if (config.contains("patch")) {
-            patch = deserialize(config.getString("patch"));
+            try {
+                patch = deserialize(config.getString("patch"));
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error loading patch for item " + key + ": " + e.getMessage() + ", Data: " + config.getString("patch"));
+                return;
+            }
         }
 
         if (config.contains("placedBlockData")) {
@@ -253,14 +262,45 @@ public class HItem {
     public void save(File file) {
         YamlConfiguration config = new YamlConfiguration();
         config.set("key", key.toString());
+        config.setComments("key", List.of("The key of the item. This is used to identify the item in the game, e.g. in /give",
+                "This should be unique and follow the format namespace:path.",
+                "Our regular custom items use the namespace 'erethon'."));
         config.set("baseItem", BuiltInRegistries.ITEM.getKey(baseItem).toString());
+        config.setComments("baseItem", List.of("The base item this custom item is based on. If this is a vanilla item, this will be the vanilla item."));
         try {
             if (patch == null) {
-                patch = baseItem.getDefaultInstance().getComponentsPatch();
+                patch = DataComponentPatch.EMPTY;
             }
+
+            DataComponentMap defaultComponents = baseItem.components();
+            DataComponentPatch.Builder defaultBuilder = DataComponentPatch.builder();
+            for (TypedDataComponent component : defaultComponents) {
+                defaultBuilder.set(component.type(), defaultComponents.get(component.type()));
+            }
+            // Add a custom data tag to the item, so we can identify it as a custom item if needed
+            if (!(key.getNamespace().equals("minecraft"))) {
+                CompoundTag tag = new CompoundTag();
+                tag.putString("hephaestus-id", key.toString());
+                DataComponentPatch.Builder customDataBuilder = DataComponentPatch.builder();
+                customDataBuilder.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+                customDataBuilder.copy(patch);
+                patch = customDataBuilder.build();
+            }
+
+            DataComponentPatch defaultPatch = defaultBuilder.build();
+
+            // This is used for reference, so we can copy things we want to change to our patch
+            config.set("vanilla", serialize(defaultPatch));
+            config.setComments("vanilla", List.of("JSON representation of the item's vanilla default data components.",
+                    "This is never applied. Copy/paste values to the patch below to modify the item's properties."));
+
+            // This contains our changes
             config.set("patch", serialize(patch));
+            config.setComments("patch", List.of("Our patch, as JSON. This is used to actually modify the item",
+                    "See https://minecraft.wiki/w/Data_component_format for all possible components.",
+                    "Components here will override vanilla components."));
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            plugin.getLogger().warning("Error saving patch for item " + key + ": " + e.getMessage() + ", Data: " + patch + ", Default: " + baseItem.components());
         }
         if (blockData != null) {
             config.set("placedBlockData", blockData.getAsString());
@@ -281,17 +321,30 @@ public class HItem {
 
     public static String serialize(DataComponentPatch patch) {
         RegistryOps<JsonElement> ops = CraftRegistry.getMinecraftRegistry().createSerializationContext(JsonOps.INSTANCE);
-        JsonObject tag = DataComponentPatch.CODEC.encodeStart(ops, patch).getOrThrow().getAsJsonObject();
+        net.minecraft.world.item.component.CustomData.SERIALIZE_CUSTOM_AS_SNBT.set(true); // This is needed for custom components. Vanilla deserialize will handle it fine
+        DataResult<JsonElement> result;
+        try {
+            result = DataComponentPatch.CODEC.encodeStart(ops, patch);
+        } finally {
+            net.minecraft.world.item.component.CustomData.SERIALIZE_CUSTOM_AS_SNBT.set(false);
+        }
+        if (result.error().isPresent()) {
+            throw new RuntimeException("Error serializing DataComponentPatch: " + result.error().get().message());
+        }
+        JsonObject tag = result.result().get().getAsJsonObject();
+        // Add the current data version, so DFU can update the component if needed
         tag.addProperty("DataVersion", SharedConstants.getCurrentVersion().getDataVersion().getVersion());
-        return tag.toString();
-   }
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        return gson.toJson(tag);
+    }
 
     public static DataComponentPatch deserialize(String string) {
         JsonObject element = JsonParser.parseString(string).getAsJsonObject();
         int dataVersion = element.get("DataVersion").getAsInt();
         int currentVersion = SharedConstants.getCurrentVersion().getDataVersion().getVersion();
-        element = (JsonObject) MinecraftServer.getServer().fixerUpper.update(References.ITEM_STACK, new Dynamic(JsonOps.INSTANCE, element), dataVersion, currentVersion).getValue();
+        element = (JsonObject) MinecraftServer.getServer().fixerUpper.update(References.DATA_COMPONENTS, new Dynamic(JsonOps.INSTANCE, element), dataVersion, currentVersion).getValue();
         RegistryOps<JsonElement> ops = CraftRegistry.getMinecraftRegistry().createSerializationContext(JsonOps.INSTANCE);
+        element.remove("DataVersion"); // This is not a component, so we can't deserialize it
         return DataComponentPatch.CODEC.decode(ops, element).getOrThrow().getFirst();
     }
 

@@ -38,6 +38,7 @@ tasks {
         val f = File(project.buildDir, "server.jar");
         uri("https://github.com/DRE2N/Papyrus/releases/download/latest/papyrus-paperclip-$papyrusVersion-mojmap.jar").toURL().openStream().use { it.copyTo(f.outputStream()) }
         serverJar(f)
+        runDirectory.set(file("C:\\Dev\\Erethon"))
     }
     compileJava {
         options.encoding = Charsets.UTF_8.name()
