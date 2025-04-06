@@ -48,19 +48,6 @@ tasks {
         filteringCharset = Charsets.UTF_8.name()
     }
 
-    javadoc {
-        options.encoding = Charsets.UTF_8.name()
-    }
-    val javadocJar by creating(Jar::class) {
-        dependsOn(javadoc)
-        archiveClassifier.set("javadoc")
-        from(javadoc)
-    }
-    val sourcesJar by creating(Jar::class) {
-        archiveClassifier.set("sources")
-        from(sourceSets.main.get().allSource)
-    }
-
     jar {
         manifest {
             attributes(
@@ -69,10 +56,6 @@ tasks {
         }
     }
 
-    assemble {
-        dependsOn(javadocJar)
-        dependsOn(sourcesJar)
-    }
 }
 
 tasks.register<Copy>("deployToSharedServer") {
@@ -88,7 +71,7 @@ publishing {
     repositories {
         maven {
             name = "erethon"
-            url = uri("https://reposilite.fyreum.de/snapshots/")
+            url = uri("https://repo.erethon.de/snapshots")
             credentials(PasswordCredentials::class)
             authentication {
                 create<BasicAuthentication>("basic")
@@ -102,7 +85,6 @@ publishing {
             version = "${project.version}"
 
             from(components["java"])
-            artifact(tasks["javadocJar"])
         }
     }
 }
