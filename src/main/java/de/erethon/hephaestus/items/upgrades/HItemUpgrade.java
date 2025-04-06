@@ -2,11 +2,6 @@ package de.erethon.hephaestus.items.upgrades;
 
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItemStack;
-import de.erethon.hephaestus.utils.HLoreEntry;
-import net.kyori.adventure.key.Key;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.translation.GlobalTranslator;
-import net.kyori.adventure.translation.TranslationRegistry;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;

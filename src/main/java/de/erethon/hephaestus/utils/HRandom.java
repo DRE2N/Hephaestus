@@ -60,4 +60,21 @@ public class HRandom {
         }
         throw new IllegalStateException("Something went wrong with the weighted random selection");
     }
+
+    public static <T extends Comparable<T>> T selectWeightedRandomValue(Map<T, Integer> weights, T minValue) {
+        int totalWeight = weights.entrySet().stream()
+                .filter(entry -> entry.getKey().compareTo(minValue) >= 0)
+                .mapToInt(Map.Entry::getValue)
+                .sum();
+        int randomIndex = ThreadLocalRandom.current().nextInt(totalWeight);
+        for (Map.Entry<T, Integer> entry : weights.entrySet()) {
+            if (entry.getKey().compareTo(minValue) >= 0) {
+                randomIndex -= entry.getValue();
+                if (randomIndex < 0) {
+                    return entry.getKey();
+                }
+            }
+        }
+        throw new IllegalStateException("Something went wrong with the weighted random selection");
+    }
 }

@@ -2,7 +2,11 @@ package de.erethon.hephaestus.blocks;
 
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItem;
+import de.erethon.hephaestus.items.HItemStack;
 import org.bukkit.GameMode;
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
@@ -11,6 +15,8 @@ import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockDamageAbortEvent;
+import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -95,6 +101,32 @@ public class HBlockLibrary implements Listener {
         }
         event.getItems().clear();
         event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation(), hItem.rollRandomStack().getBukkitStack());
+    }
+
+    @EventHandler
+    private void onBreakStart(BlockDamageEvent event) {
+        Player player = event.getPlayer();
+        HItem hItem = getItem(event.getBlock().getBlockData());
+        if (hItem == null) {
+            return;
+        }
+        AttributeModifier modifier = new AttributeModifier(NamespacedKey.fromString("hephaestus:break_speed"), hItem.getBreakSpeedModifier(), AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+        if (!player.getAttribute(Attribute.BLOCK_BREAK_SPEED).getModifiers().contains(modifier)) {
+            player.getAttribute(Attribute.BLOCK_BREAK_SPEED).addTransientModifier(modifier);
+        }
+    }
+
+    @EventHandler
+    private void onBreakAbort(BlockDamageAbortEvent event) {
+        Player player = event.getPlayer();
+        HItem hItem = getItem(event.getBlock().getBlockData());
+        if (hItem == null) {
+            return;
+        }
+        // Amount does not matter, remove only cares about the key
+        AttributeModifier modifier = new AttributeModifier(NamespacedKey.fromString("hephaestus:break_speed"), 0, AttributeModifier.Operation.MULTIPLY_SCALAR_1);
+        player.getAttribute(Attribute.BLOCK_BREAK_SPEED).removeModifier(modifier);
+
     }
 
 }

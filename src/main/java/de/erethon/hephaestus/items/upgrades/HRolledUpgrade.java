@@ -44,7 +44,7 @@ public class HRolledUpgrade implements HLoreEntry {
     @Override
     public Component getLoreLine() {
         Component c = Component.text("+", NamedTextColor.GREEN);
-        return Component.translatable("hephaestus.upgrade." + upgrade.getId() + ".name");
+        return c.append(Component.translatable("hephaestus.upgrade." + upgrade.getId() + ".name"));
     }
 
     public CompoundTag toNBT() {

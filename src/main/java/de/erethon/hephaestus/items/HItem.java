@@ -11,14 +11,14 @@ import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.JsonOps;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.interactions.HItemDropAction;
-import de.erethon.hephaestus.items.interactions.HItemEquipmentChangeAction;
+import de.erethon.hephaestus.items.interactions.HItemEquipAction;
 import de.erethon.hephaestus.items.interactions.HItemInteractAction;
+import de.erethon.hephaestus.items.interactions.HItemUnequipAction;
 import de.erethon.hephaestus.utils.HRandom;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.component.PatchedDataComponentMap;
 import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -28,7 +28,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -64,6 +63,10 @@ public class HItem {
     private BlockData blockData = null;
     private SoundEvent placementSound = null;
     private final Set<String> allowedUpgrades = new HashSet<>();
+    private final Set<String> tags = new HashSet<>();
+
+    // Blocks
+    private float breakSpeedModifier = 1.0f;
 
     // Randomization
     private Map<Integer, Integer> levelWeights = new HashMap<>();
@@ -72,7 +75,8 @@ public class HItem {
 
     // Interactions
     private final Set<HItemInteractAction> interactActions = new HashSet<>();
-    private final Set<HItemEquipmentChangeAction> equipmentChangeActions = new HashSet<>();
+    private final Set<HItemEquipAction> equipActions = new HashSet<>();
+    private final Set<HItemUnequipAction> unequipActions = new HashSet<>();
     private final Set<HItemDropAction> dropActions = new HashSet<>();
 
     public HItem(File file) {
@@ -95,8 +99,12 @@ public class HItem {
         interactActions.add(action);
     }
 
-    public void registerEquipmentChangeAction(HItemEquipmentChangeAction action) {
-        equipmentChangeActions.add(action);
+    public void registerEquipAction(HItemEquipAction action) {
+        equipActions.add(action);
+    }
+
+    public void registerUnequipAction(HItemUnequipAction action) {
+        unequipActions.add(action);
     }
 
     public void registerDropAction(HItemDropAction action) {
@@ -107,8 +115,12 @@ public class HItem {
         interactActions.forEach(action -> action.onInteract(stack, event));
     }
 
-    public void runEquipmentChangeActions(HItemStack stack, PlayerArmorChangeEvent event) {
-        equipmentChangeActions.forEach(action -> action.onEquip(stack, event));
+    public void runEquipActions(HItemStack stack, PlayerArmorChangeEvent event) {
+        equipActions.forEach(action -> action.onEquip(stack, event));
+    }
+
+    public void runUnequipActions(HItemStack stack, PlayerArmorChangeEvent event) {
+        unequipActions.forEach(action -> action.onUnequip(stack, event));
     }
 
     public void runDropActions(HItemStack stack, EntityDropItemEvent event) {
@@ -116,21 +128,25 @@ public class HItem {
     }
 
     public HItemStack rollRandomStack() {
+        return rollRandomStack(0);
+    }
+
+    public HItemStack rollRandomStack(int minLevel) {
         HItemStack hStack = new HItemStack(this);
         hStack.update();
 
-        int itemLevel = 0;
+        int level = 0;
         if (levelWeights != null && !levelWeights.isEmpty()) {
-            itemLevel = HRandom.selectWeightedRandomValue(levelWeights);
-            hStack.setItemLevel(itemLevel);
+            level = HRandom.selectWeightedRandomValue(levelWeights, minLevel);
+            hStack.setItemLevel(level);
         }
 
-        Map<String, Integer> rarityWeightsForLevel = rarityWeights.getOrDefault(itemLevel, new HashMap<>());
+        Map<String, Integer> rarityWeightsForLevel = rarityWeights.getOrDefault(level, new HashMap<>());
         if (!rarityWeightsForLevel.isEmpty()) {
             hStack.setRarity(HRarity.valueOf(HRandom.selectWeightedRandomValue(rarityWeightsForLevel).toUpperCase(Locale.ROOT)));
         }
 
-        Map<Integer, Integer> slotWeightsForLevel = slotWeights.getOrDefault(itemLevel, new HashMap<>());
+        Map<Integer, Integer> slotWeightsForLevel = slotWeights.getOrDefault(level, new HashMap<>());
         if (!slotWeightsForLevel.isEmpty()) {
             hStack.setMaxUpgrades(HRandom.selectWeightedRandomValue(slotWeightsForLevel));
         }
@@ -157,6 +173,26 @@ public class HItem {
     public void setBlockData(BlockData blockData) {
         this.blockData = blockData;
         plugin.getBlockLibrary().register(this, blockData);
+    }
+
+    public float getBreakSpeedModifier() {
+        return breakSpeedModifier;
+    }
+
+    public Set<String> getTags() {
+        return tags;
+    }
+
+    public boolean hasTag(String tag) {
+        return tags.contains(tag);
+    }
+
+    public void addTag(String tag) {
+        tags.add(tag);
+    }
+
+    public void removeTag(String tag) {
+        tags.remove(tag);
     }
 
     public @NotNull Sound getPlacementSound() {
@@ -238,8 +274,19 @@ public class HItem {
             blockData = Bukkit.getServer().createBlockData(config.getString("placedBlockData"));
             plugin.getBlockLibrary().register(this, blockData);
         }
+        if (config.contains("breakSpeedModifier")) {
+            breakSpeedModifier = (float) config.getDouble("breakSpeedModifier", 1.0f);
+        }
         if (config.contains("placementSound")) {
             placementSound = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.parse(config.getString("placementSound", "minecraft:block.stone.place"))).get().value();
+        }
+        if (config.contains("allowedUpgrades")) {
+            List<String> allowedUpgrades = config.getStringList("allowedUpgrades");
+            this.allowedUpgrades.addAll(allowedUpgrades);
+        }
+        if (config.contains("tags")) {
+            List<String> tags = config.getStringList("tags");
+            this.tags.addAll(tags);
         }
         levelWeights = HRandom.loadWeights(config, "random.level");
         // Load level-specific rarity and slot weights

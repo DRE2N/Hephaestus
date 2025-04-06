@@ -1,28 +1,24 @@
 package de.erethon.hephaestus.listeners;
 
+import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.papyrus.events.ContainerLoadEvent;
 import de.erethon.papyrus.events.PlayerInventoryLoadEvent;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
+import io.papermc.paper.datacomponent.DataComponentTypes;
 import net.minecraft.world.item.ItemStack;
-import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 
-import javax.annotation.Nullable;
+import java.util.Collections;
 
 public class HListener implements Listener {
 
-    private final Hephaestus plugin;
-
     public HListener(Hephaestus plugin) {
-        this.plugin = plugin;
     }
 
     @EventHandler
@@ -76,6 +72,47 @@ public class HListener implements Listener {
             return;
         }
         stack.getItem().runDropActions(stack, event);
+    }
+
+    @EventHandler
+    private void onEquipmentChange(PlayerArmorChangeEvent event) {
+        org.bukkit.inventory.ItemStack oldItem = event.getOldItem();
+        org.bukkit.inventory.ItemStack newItem = event.getNewItem();
+        // Unequipping
+        if (newItem.getType() == org.bukkit.Material.AIR) {
+            HItemStack stack = Hephaestus.getStack(oldItem);
+            if (stack == null) {
+                return;
+            }
+            stack.getItem().runUnequipActions(stack, event);
+            return;
+        }
+        // A damaged item is a different item, filter it out
+        if (newItem.matchesWithoutData(oldItem, Collections.singleton(DataComponentTypes.DAMAGE))) {
+            return;
+        }
+        // Equipping
+        HItemStack stack = Hephaestus.getStack(newItem);
+        if (stack == null) {
+            return;
+        }
+        stack.getItem().runEquipActions(stack, event);
+    }
+
+    @EventHandler
+    private void onInteract(PlayerInteractEvent event) {
+        if (!(event.hasItem() && event.getItem() != null)) {
+            return;
+        }
+        org.bukkit.inventory.ItemStack item = event.getItem();
+        if (item.getType() == org.bukkit.Material.AIR) {
+            return;
+        }
+        HItemStack stack = Hephaestus.getStack(item);
+        if (stack == null) {
+            return;
+        }
+        stack.getItem().runInteractActions(stack, event);
     }
 
     private HItemStack onItemLoad(ItemStack item) {

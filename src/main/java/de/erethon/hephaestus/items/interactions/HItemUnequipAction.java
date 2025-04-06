@@ -2,10 +2,9 @@ package de.erethon.hephaestus.items.interactions;
 
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
 import de.erethon.hephaestus.items.HItemStack;
-import org.bukkit.event.player.PlayerInteractEvent;
 
 @FunctionalInterface
-public interface HItemEquipmentChangeAction {
+public interface HItemUnequipAction {
 
-    void onEquip(HItemStack stack, PlayerArmorChangeEvent event);
+    void onUnequip(HItemStack stack, PlayerArmorChangeEvent event);
 }

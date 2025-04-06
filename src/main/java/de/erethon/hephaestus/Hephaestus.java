@@ -25,7 +25,6 @@ public final class Hephaestus extends JavaPlugin {
 
     private final HItemLibrary itemLibrary;
     private final HBlockLibrary blockLibrary = new HBlockLibrary();
-    private HListener inventoryListener;
     GlobalTranslator globalTranslator = GlobalTranslator.translator();
     TranslationRegistry translationRegistry = TranslationRegistry.create(Key.key("hephaestus"));
 
@@ -46,8 +45,8 @@ public final class Hephaestus extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        inventoryListener = new HListener(this);
-        Bukkit.getPluginManager().registerEvents(inventoryListener, this);
+        HListener itemListener = new HListener(this);
+        Bukkit.getPluginManager().registerEvents(itemListener, this);
         Bukkit.getPluginManager().registerEvents(blockLibrary, this);
         itemLibrary.load();
         if (itemLibrary.get(BuiltInRegistries.ITEM.getKey(Items.DIAMOND)) == null) {
