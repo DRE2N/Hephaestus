@@ -8,6 +8,7 @@ import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.papyrus.events.ContainerLoadEvent;
 import de.erethon.papyrus.events.PlayerInventoryLoadEvent;
 import io.papermc.paper.datacomponent.DataComponentTypes;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -32,13 +33,8 @@ public class HListener implements Listener {
             }
             onItemLoad(item).updateVisuals(player);
         }
-        for (ItemStack item : event.armor) {
-            if (item.isEmpty()) {
-                continue;
-            }
-            onItemLoad(item).updateVisuals(player);
-        }
-        for (ItemStack item : event.offHand) {
+        for (EquipmentSlot slot : EquipmentSlot.values()) {
+            ItemStack item = event.equipment.get(slot);
             if (item.isEmpty()) {
                 continue;
             }

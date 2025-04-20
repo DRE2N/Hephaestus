@@ -59,11 +59,11 @@ public class HRolledUpgrade implements HLoreEntry {
     }
 
     public static @Nullable HRolledUpgrade fromNBT(HItemStack stack, CompoundTag tag) {
-        HItemUpgrade upgrade = stack.getItem().getLibrary().getUpgrade(tag.getString("id"));
+        HItemUpgrade upgrade = stack.getItem().getLibrary().getUpgrade(tag.getString("id").get());
         if (upgrade == null) {
             return null;
         }
-        HRolledUpgrade rolledUpgrade = new HRolledUpgrade(stack, upgrade, tag.getCompound("values"));
+        HRolledUpgrade rolledUpgrade = new HRolledUpgrade(stack, upgrade, tag.getCompound("values").get());
         return rolledUpgrade;
     }
 }

@@ -13,6 +13,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 
 public class HItemLibrary {
 
@@ -48,8 +49,11 @@ public class HItemLibrary {
             }
             return new HItemStack(item, stack);
         }
-        String id = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getString("hephaestus-id");
-        HItem item = items.get(ResourceLocation.parse(id));
+        Optional<String> id = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getString("hephaestus-id");
+        if (id.isEmpty()) {
+            return null;
+        }
+        HItem item = items.get(ResourceLocation.parse(id.get()));
         return new HItemStack(item, stack);
     }
 

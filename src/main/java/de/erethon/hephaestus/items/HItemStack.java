@@ -4,6 +4,7 @@ import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
 import de.erethon.hephaestus.items.upgrades.HRolledUpgrade;
 import de.erethon.hephaestus.utils.HUpgradeResult;
+import net.kyori.adventure.text.Component;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -16,6 +17,7 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 // A HItemStack is an item in the world, and has various properties. It references a HItem, which is the base item and acts as a template for the item.
 public class HItemStack {
@@ -183,13 +185,14 @@ public class HItemStack {
 
     private void loadDataFromNBT() {
         if (stack.has(DataComponents.CUSTOM_DATA)) {
-            CompoundTag tag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getCompound("hephaestus-data");
-            if (tag.isEmpty()) {
+            Optional<CompoundTag> optTag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getCompound("hephaestus-data");
+            if (optTag.isEmpty()) {
                 return;
             }
-            itemLevel = tag.getInt("level");
-            rarity = HRarity.valueOf(tag.getString("rarity").toUpperCase(Locale.ROOT));
-            maxUpgrades = tag.getInt("maxUpgrades");
+            CompoundTag tag = optTag.get();
+            itemLevel = tag.getInt("level").get();
+            rarity = HRarity.valueOf(tag.getString("rarity").get().toUpperCase(Locale.ROOT));
+            maxUpgrades = tag.getInt("maxUpgrades").get();
             loadUpgradesFromTag(tag);
         } else {
             CompoundTag compoundTag = new CompoundTag();
@@ -222,8 +225,8 @@ public class HItemStack {
 
     private void loadUpgradesFromTag(CompoundTag compoundTag) {
         CompoundTag upgradeTag = compoundTag.getCompound("upgrades");
-        for (String key : upgradeTag.getAllKeys()) {
-            HRolledUpgrade upgrade = HRolledUpgrade.fromNBT(this, upgradeTag.getCompound(key));
+        for (String key : upgradeTag.keySet()) {
+            HRolledUpgrade upgrade = HRolledUpgrade.fromNBT(this, upgradeTag.getCompound(key).get());
             if (upgrade != null) {
                 upgrades.add(upgrade);
                 continue;
