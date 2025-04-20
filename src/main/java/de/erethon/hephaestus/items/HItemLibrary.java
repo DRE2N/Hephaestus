@@ -36,6 +36,10 @@ public class HItemLibrary {
         return items.get(key);
     }
 
+    public HItem get(String key) {
+        return items.get(ResourceLocation.parse(key));
+    }
+
     public HItemStack get(net.minecraft.world.item.ItemStack stack) {
         if (!stack.has(DataComponents.CUSTOM_DATA)) {
             HItem item = items.get(BuiltInRegistries.ITEM.getKey(stack.getItem()));
@@ -96,14 +100,15 @@ public class HItemLibrary {
 
     // Registration
 
-    public void register(ItemStack item, NamespacedKey key){
+    public HItem register(ItemStack item, NamespacedKey key){
         net.minecraft.world.item.ItemStack nmsItem = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(item);
-        register(nmsItem, ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
+        return register(nmsItem, ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
     }
 
-    public void register(net.minecraft.world.item.ItemStack item, ResourceLocation key) {
+    public HItem register(net.minecraft.world.item.ItemStack item, ResourceLocation key) {
         HItem hItem = new HItem(key, item.getItem(), item.getComponentsPatch());
         items.put(key, hItem);
+        return hItem;
     }
 
     // Save/Load

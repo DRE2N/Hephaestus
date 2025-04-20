@@ -1,18 +1,20 @@
 package de.erethon.hephaestus;
 
 import de.erethon.hephaestus.blocks.HBlockLibrary;
+import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemLibrary;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.listeners.HListener;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.translation.GlobalTranslator;
 import net.kyori.adventure.translation.TranslationRegistry;
-import net.kyori.adventure.translation.Translator;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -41,6 +43,22 @@ public final class Hephaestus extends JavaPlugin {
 
     public static HItemStack getStack(org.bukkit.inventory.ItemStack stack) {
         return INSTANCE.getLibrary().get(stack);
+    }
+
+    public static HItem getItem(NamespacedKey key) {
+        return INSTANCE.getLibrary().get(key);
+    }
+
+    public static HItem getItem(String key) {
+        return INSTANCE.getLibrary().get(key);
+    }
+
+    public static HItem registerNewFromBukkit(String key, Material material) {
+        return registerNewFromBukkit(key, new org.bukkit.inventory.ItemStack(material));
+    }
+
+    public static HItem registerNewFromBukkit(String key, org.bukkit.inventory.ItemStack stack) {
+        return INSTANCE.getLibrary().register(ItemStack.fromBukkitCopy(stack), ResourceLocation.parse(key));
     }
 
     @Override

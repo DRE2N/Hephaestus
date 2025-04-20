@@ -2,6 +2,8 @@ package de.erethon.hephaestus.listeners;
 
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
 import de.erethon.hephaestus.Hephaestus;
+import de.erethon.hephaestus.events.HItemEquipEvent;
+import de.erethon.hephaestus.events.HItemUnequipEvent;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.papyrus.events.ContainerLoadEvent;
 import de.erethon.papyrus.events.PlayerInventoryLoadEvent;
@@ -85,6 +87,7 @@ public class HListener implements Listener {
                 return;
             }
             stack.getItem().runUnequipActions(stack, event);
+            new HItemUnequipEvent(stack.getItem(), event.getPlayer(), event).callEvent();
             return;
         }
         // A damaged item is a different item, filter it out
@@ -97,6 +100,7 @@ public class HListener implements Listener {
             return;
         }
         stack.getItem().runEquipActions(stack, event);
+        new HItemEquipEvent(stack.getItem(), event.getPlayer(), event).callEvent();
     }
 
     @EventHandler
