@@ -224,7 +224,7 @@ public class HItemStack {
     }
 
     private void loadUpgradesFromTag(CompoundTag compoundTag) {
-        CompoundTag upgradeTag = compoundTag.getCompound("upgrades");
+        CompoundTag upgradeTag = compoundTag.getCompound("upgrades").get();
         for (String key : upgradeTag.keySet()) {
             HRolledUpgrade upgrade = HRolledUpgrade.fromNBT(this, upgradeTag.getCompound(key).get());
             if (upgrade != null) {
@@ -242,7 +242,7 @@ public class HItemStack {
             key = vanillaKey;
         } else {
             CompoundTag tag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe(); // Avoid copy
-            key = ResourceLocation.parse(tag.getString("hephaestus-id"));
+            key = ResourceLocation.parse(tag.getString("hephaestus-id").get());
         }
         HItem item = Hephaestus.INSTANCE.getLibrary().get(key);
         if (item == null) { // If deleted, return vanilla item
