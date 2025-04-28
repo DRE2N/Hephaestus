@@ -198,8 +198,8 @@ public class HItemStack {
             CompoundTag compoundTag = new CompoundTag();
             compoundTag.putString("hephaestus-id", item.getKey().toString());
             CompoundTag upgradesTag = new CompoundTag();
-            //saveUpgradesInTag(upgradesTag);
-            //compoundTag.put("upgrades", upgradesTag);
+            saveUpgradesInTag(upgradesTag);
+            compoundTag.put("upgrades", upgradesTag);
             CustomData.set(DataComponents.CUSTOM_DATA, stack, compoundTag);
         }
     }

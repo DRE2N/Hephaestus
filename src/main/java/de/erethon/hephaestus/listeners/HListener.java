@@ -33,6 +33,9 @@ public class HListener implements Listener {
             }
             onItemLoad(item).updateVisuals(player);
         }
+        if (event.equipment == null) { // A player might have no equipment
+            return;
+        }
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             ItemStack item = event.equipment.get(slot);
             if (item.isEmpty()) {
