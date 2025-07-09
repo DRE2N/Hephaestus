@@ -380,7 +380,7 @@ public class HItem {
         }
         JsonObject tag = result.result().get().getAsJsonObject();
         // Add the current data version, so DFU can update the component if needed
-        tag.addProperty("DataVersion", SharedConstants.getCurrentVersion().getDataVersion().getVersion());
+        tag.addProperty("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         return gson.toJson(tag);
     }
@@ -388,7 +388,7 @@ public class HItem {
     public static DataComponentPatch deserialize(String string) {
         JsonObject element = JsonParser.parseString(string).getAsJsonObject();
         int dataVersion = element.get("DataVersion").getAsInt();
-        int currentVersion = SharedConstants.getCurrentVersion().getDataVersion().getVersion();
+        int currentVersion = SharedConstants.getCurrentVersion().dataVersion().version();
         element = (JsonObject) MinecraftServer.getServer().fixerUpper.update(References.DATA_COMPONENTS, new Dynamic(JsonOps.INSTANCE, element), dataVersion, currentVersion).getValue();
         RegistryOps<JsonElement> ops = CraftRegistry.getMinecraftRegistry().createSerializationContext(JsonOps.INSTANCE);
         element.remove("DataVersion"); // This is not a component, so we can't deserialize it

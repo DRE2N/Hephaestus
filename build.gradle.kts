@@ -11,7 +11,7 @@ repositories {
 plugins {
     `java-library`
     `maven-publish`
-    id("io.papermc.paperweight.userdev") version "2.0.0-beta.14"
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.17"
     id("xyz.jpenilla.run-paper") version "1.0.6" // Adds runServer and runMojangMappedServer tasks for testing
 }
 
@@ -23,7 +23,7 @@ java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
-val papyrusVersion = "1.21.5-R0.1-SNAPSHOT"
+val papyrusVersion = "1.21.7-R0.1-SNAPSHOT"
 
 dependencies {
     paperweight.devBundle("de.erethon.papyrus", papyrusVersion) { isChanging = true}
@@ -59,6 +59,7 @@ tasks {
 }
 
 tasks.register<Copy>("deployToSharedServer") {
+    doNotTrackState("")
     group = "Erethon"
     description = "Used for deploying the plugin to the shared server. runServer will do this automatically." +
             "This task is only for manual deployment when running runServer from another plugin."
