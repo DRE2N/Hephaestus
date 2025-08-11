@@ -154,6 +154,32 @@ public class HItem {
         return hStack;
     }
 
+    public HItemStack createStack() {
+        return createStack(1);
+    }
+
+    public HItemStack createStack(int amount) {
+        return createStack(amount, 0);
+    }
+
+    public  HItemStack createStack(int amount, int level) {
+        return createStack(amount, level, 0);
+    }
+
+    public HItemStack createStack(int amount, int level, int maxUpgrades) {
+        return createStack(amount, level, maxUpgrades, HRarity.COMMON);
+    }
+
+    public HItemStack createStack(int amount, int level, int maxUpgrades, HRarity rarity) {
+        HItemStack hStack = new HItemStack(this);
+        hStack.update();
+        hStack.setItemLevel(level);
+        hStack.setMaxUpgrades(maxUpgrades);
+        hStack.setRarity(rarity);
+        hStack.getVanillaStack().setCount(amount);
+        return hStack;
+    }
+
     public ResourceLocation getKey() {
         return key;
     }
@@ -242,6 +268,21 @@ public class HItem {
                     }
                     String id =  this.key.toString().replace(":", ".");
                     plugin.registerTranslation("hephaestus.item." + id + ".name", locale, config.getString("name." + key));
+                }
+            }
+        }
+        if (config.contains("category")) {
+            ConfigurationSection categorySection = config.getConfigurationSection("category");
+            if (categorySection != null) {
+                for (String key : categorySection.getKeys(false)) {
+                    Locale locale;
+                    if (key.contains("de")) {
+                        locale = Locale.GERMANY;
+                    } else {
+                        locale = Locale.US;
+                    }
+                    String id = this.key.toString().replace(":", ".");
+                    plugin.registerTranslation("hephaestus.item." + id + ".category", locale, config.getString("category." + key));
                 }
             }
         }

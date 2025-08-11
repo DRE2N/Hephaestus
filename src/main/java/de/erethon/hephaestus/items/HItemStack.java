@@ -4,13 +4,17 @@ import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
 import de.erethon.hephaestus.items.upgrades.HRolledUpgrade;
 import de.erethon.hephaestus.utils.HUpgradeResult;
+import io.papermc.paper.adventure.PaperAdventure;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.item.component.ItemLore;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 
@@ -22,10 +26,14 @@ import java.util.Optional;
 // A HItemStack is an item in the world, and has various properties. It references a HItem, which is the base item and acts as a template for the item.
 public class HItemStack {
 
+    private static final MiniMessage miniMessage = MiniMessage.miniMessage();
+
     private HItem item;
     private int itemLevel = 0;
     private HRarity rarity = HRarity.COMMON;
     private int maxUpgrades = 0;
+    private String playerAddedFlavourText = "";
+    private String playerAddedName = "";
     private final List<HRolledUpgrade> upgrades = new ArrayList<>();
 
     private ItemStack stack;
@@ -176,11 +184,41 @@ public class HItemStack {
         if (item.isVanilla()) {
             return;
         }
+        // Update name
         String id =  item.getKey().toString().replace(":", ".");
-        stack.set(DataComponents.ITEM_NAME, net.minecraft.network.chat.Component.translatable("hephaestus.item." + id + ".name"));
-        for (HRolledUpgrade upgrade : upgrades) {
-            stack.set(DataComponents.ITEM_NAME,net.minecraft.network.chat.Component.translatable("hephaestus.upgrade." + upgrade.getId() + ".name"));
+        net.minecraft.network.chat.Component nameComponent = net.minecraft.network.chat.Component.translatable("hephaestus.item." + id + ".name");
+        if (!playerAddedName.isEmpty()) {
+            Component advComponent = miniMessage.deserialize(playerAddedName);
+            nameComponent = PaperAdventure.asVanilla(advComponent);
         }
+        stack.set(DataComponents.ITEM_NAME, nameComponent);
+        // Construct lore
+        // ---- Name ----
+        // Level | Category | Rarity
+        // flavour text
+        //
+        // Upgrade lore lines
+        List<net.minecraft.network.chat.Component> lore = new ArrayList<>();
+        if (itemLevel != 0) { // Only item levels get the fancy header
+            Component verticalLine = Component.text(" | ", NamedTextColor.DARK_GRAY);
+            Component header = Component.text(itemLevel, NamedTextColor.GOLD).append(verticalLine)
+                    .append(Component.translatable("hephaestus.item." + id + ".category"))
+                    .append(verticalLine)
+                    .append(Component.translatable(rarity.getTranslationKey(), rarity.getColor()));
+            lore.add(PaperAdventure.asVanilla(header));
+        }
+        Component flavourText = Component.translatable("hephaestus.item." + id + ".flavour");
+        if (!playerAddedFlavourText.isEmpty()) {
+            Component advComponent = miniMessage.deserialize(playerAddedFlavourText);
+            flavourText = flavourText.append(advComponent);
+        }
+        lore.add(PaperAdventure.asVanilla(flavourText));
+        lore.add(PaperAdventure.asVanilla(Component.empty()));
+        for (HRolledUpgrade upgrade : upgrades) {
+            lore.add(PaperAdventure.asVanilla(upgrade.getLoreLine()));
+        }
+
+        stack.set(DataComponents.LORE, new ItemLore(lore));
     }
 
     private void loadDataFromNBT() {
@@ -193,6 +231,8 @@ public class HItemStack {
             itemLevel = tag.getInt("level").get();
             rarity = HRarity.valueOf(tag.getString("rarity").get().toUpperCase(Locale.ROOT));
             maxUpgrades = tag.getInt("maxUpgrades").get();
+            playerAddedName = tag.getString("playerAddedName").get();
+            playerAddedFlavourText = tag.getString("playerAddedFlavourText").get();
             loadUpgradesFromTag(tag);
         } else {
             CompoundTag compoundTag = new CompoundTag();
@@ -210,6 +250,8 @@ public class HItemStack {
         tag.putInt("level", itemLevel);
         tag.putString("rarity", rarity.name());
         tag.putInt("maxUpgrades", maxUpgrades);
+        tag.putString("playerAddedName", playerAddedName);
+        tag.putString("playerAddedFlavourText", playerAddedFlavourText);
         CompoundTag upgradesTag = new CompoundTag();
         saveUpgradesInTag(upgradesTag);
         tag.put("upgrades", upgradesTag);

@@ -113,6 +113,10 @@ public class HBlockLibrary implements Listener {
         AttributeModifier modifier = new AttributeModifier(NamespacedKey.fromString("hephaestus:break_speed"), hItem.getBreakSpeedModifier(), AttributeModifier.Operation.MULTIPLY_SCALAR_1);
         if (!player.getAttribute(Attribute.BLOCK_BREAK_SPEED).getModifiers().contains(modifier)) {
             player.getAttribute(Attribute.BLOCK_BREAK_SPEED).addTransientModifier(modifier);
+        } else {
+            // Can't directly modify the existing modifier sadly
+            player.getAttribute(Attribute.BLOCK_BREAK_SPEED).removeModifier(modifier);
+            player.getAttribute(Attribute.BLOCK_BREAK_SPEED).addTransientModifier(modifier);
         }
     }
 

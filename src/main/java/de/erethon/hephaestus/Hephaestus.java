@@ -71,6 +71,7 @@ public final class Hephaestus extends JavaPlugin {
             getLogger().warning("No vanilla items found. Generating default items...");
             generateDefaultItems();
         }
+        registerCommonTranslations();
     }
 
     @Override
@@ -104,5 +105,24 @@ public final class Hephaestus extends JavaPlugin {
         }
         getLogger().info("Generated " + count + " default items.");
         itemLibrary.save();
+    }
+
+    private void registerCommonTranslations() {
+        // EN
+        registerTranslation("hephaestus.rarity.trash.name", Locale.US, "Trash");
+        registerTranslation("hephaestus.rarity.common.name", Locale.US, "Common");
+        registerTranslation("hephaestus.rarity.uncommon.name", Locale.US, "Uncommon");
+        registerTranslation("hephaestus.rarity.rare.name", Locale.US, "Rare");
+        registerTranslation("hephaestus.rarity.epic.name", Locale.US, "Epic");
+        registerTranslation("hephaestus.rarity.legendary.name", Locale.US, "Legendary");
+        registerTranslation("hephaestus.rarity.mythic.name", Locale.US, "Mythical");
+        // DE
+        registerTranslation("hephaestus.rarity.trash.name", Locale.GERMANY, "Müll");
+        registerTranslation("hephaestus.rarity.common.name", Locale.GERMANY, "Gewöhnlich");
+        registerTranslation("hephaestus.rarity.uncommon.name", Locale.GERMANY, "Ungewöhnlich");
+        registerTranslation("hephaestus.rarity.rare.name", Locale.GERMANY, "Selten");
+        registerTranslation("hephaestus.rarity.epic.name", Locale.GERMANY, "Episch");
+        registerTranslation("hephaestus.rarity.legendary.name", Locale.GERMANY, "Legendär");
+        registerTranslation("hephaestus.rarity.mythic.name", Locale.GERMANY, "Mythisch");
     }
 }

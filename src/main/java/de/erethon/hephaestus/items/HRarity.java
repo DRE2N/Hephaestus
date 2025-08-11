@@ -21,4 +21,8 @@ public enum HRarity {
     public TextColor getColor() {
         return color;
     }
+
+    public String getTranslationKey() {
+        return "hephaestus.rarity." + name().toLowerCase() + ".name";
+    }
 }

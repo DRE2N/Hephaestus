@@ -63,7 +63,6 @@ public class HRolledUpgrade implements HLoreEntry {
         if (upgrade == null) {
             return null;
         }
-        HRolledUpgrade rolledUpgrade = new HRolledUpgrade(stack, upgrade, tag.getCompound("values").get());
-        return rolledUpgrade;
+        return new HRolledUpgrade(stack, upgrade, tag.getCompound("values").get());
     }
 }
