@@ -3,6 +3,7 @@ package de.erethon.hephaestus.items;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
 import de.erethon.hephaestus.utils.HLibraryAction;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -110,7 +111,7 @@ public class HItemLibrary {
     }
 
     public HItem register(net.minecraft.world.item.ItemStack item, ResourceLocation key) {
-        HItem hItem = new HItem(key, item.getItem(), item.getComponentsPatch());
+        HItem hItem = new HItem(key, item.getItem(), sanitizePatch(item.getComponentsPatch()));
         items.put(key, hItem);
         return hItem;
     }
@@ -140,7 +141,7 @@ public class HItemLibrary {
             return;
         }
         boolean isUpgradeDirectory = directory.equals(upgradeDataDirectory);
-        Hephaestus.INSTANCE.getLogger().info("Loading " + directory.getName());
+        Hephaestus.INSTANCE.getLogger().info("Loading namespace: " + directory.getName());
         for (File file : directory.listFiles()) {
             if (file.isDirectory()) {
                 loadFilesForDirectory(file);
@@ -191,5 +192,18 @@ public class HItemLibrary {
             File file = new File(subDirectory, item.getKey().getPath() + ".yml");
             item.save(file);
         }
+    }
+
+    private DataComponentPatch sanitizePatch(DataComponentPatch original) {
+        if (original == null || original == DataComponentPatch.EMPTY) {
+            return original;
+        }
+        boolean hasCustom = original.entrySet().stream().anyMatch(e -> e.getKey() == DataComponents.CUSTOM_DATA);
+        if (!hasCustom) {
+            return original;
+        }
+        DataComponentPatch sanitized = original.forget(type -> type == DataComponents.CUSTOM_DATA);
+        Hephaestus.INSTANCE.getLogger().fine("Removed CUSTOM_DATA from registered patch (size=" + original.entrySet().size() + ")");
+        return sanitized;
     }
 }

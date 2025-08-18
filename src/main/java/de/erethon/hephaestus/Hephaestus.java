@@ -29,6 +29,7 @@ public final class Hephaestus extends JavaPlugin {
     private final HBlockLibrary blockLibrary = new HBlockLibrary();
     GlobalTranslator globalTranslator = GlobalTranslator.translator();
     TranslationRegistry translationRegistry = TranslationRegistry.create(Key.key("hephaestus"));
+    private boolean translationSourceAdded = false; // ensure we only add once
 
     public Hephaestus(HItemLibrary itemLibrary) {
         super();
@@ -72,6 +73,12 @@ public final class Hephaestus extends JavaPlugin {
             generateDefaultItems();
         }
         registerCommonTranslations();
+        // Register our translation registry as a source (after initial registrations)
+        if (!translationSourceAdded) {
+            GlobalTranslator.translator().addSource(translationRegistry);
+            translationSourceAdded = true;
+            getLogger().info("Hephaestus translation source registered.");
+        }
     }
 
     @Override
@@ -88,10 +95,16 @@ public final class Hephaestus extends JavaPlugin {
     }
 
     public void registerTranslation(String key, Locale locale, String translation) {
-        if (translationRegistry.contains(key))  {
+        if (translation == null) {
+            return;
+        }
+        // Allow multiple locales per key; only skip if this exact locale already has a value
+        if (translationRegistry.translate(key, locale) != null) {
             return;
         }
         translationRegistry.register(key, locale, new MessageFormat(translation));
+        // Optional lightweight debug (can be removed if noisy)
+        // getLogger().fine("Registered translation: " + key + " (" + locale + ")");
     }
 
 

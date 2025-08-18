@@ -1,5 +1,6 @@
 package de.erethon.hephaestus.utils;
 
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.util.HashMap;
@@ -12,45 +13,94 @@ public class HRandom {
 
     public static <T> Map<T, Integer> loadWeights(YamlConfiguration config, String path) {
         Map<T, Integer> weights = new HashMap<>();
-        if (path.equals("random.rarity")) {
-            Map<String, Object> rarities = config.getConfigurationSection(path).getValues(false);
-            for (Map.Entry<String, Object> entry : rarities.entrySet()) {
-                weights.put((T) entry.getKey(), (Integer) entry.getValue());
-            }
-        } else {
-            List<Map<?, ?>> items = config.getMapList(path);
-            for (Map<?, ?> item : items) {
-                double min, max;
-                boolean isInt;
-                if (item.get("min") instanceof Integer) {
-                    min = (Integer) item.get("min");
-                    isInt = true;
-                } else {
-                    min = (double) item.get("min");
-                    isInt = false;
+
+        // Try list-of-range-maps first (e.g. random.level: - min/max/weight ...)
+        // getMapList always returns a non-null list (possibly empty)
+        List<Map<?, ?>> mapList = config.getMapList(path);
+        if (!mapList.isEmpty()) {
+            for (Map<?, ?> item : mapList) {
+                if (item == null) {
+                    System.err.println("Warning: Null entry in list at '" + path + "'");
+                    continue;
                 }
-                if (item.get("max") instanceof Integer) {
-                    max = (Integer) item.get("max");
-                } else {
-                    max = (double) item.get("max");
+                Object minObj = item.get("min");
+                Object maxObj = item.get("max");
+                Object weightObj = item.get("weight");
+
+                if (minObj == null || maxObj == null || weightObj == null) {
+                    System.err.println("Warning: Malformed entry in '" + path + "' (needs min,max,weight): " + item);
+                    continue;
                 }
-                int weight = (Integer) item.get("weight");
-                if (isInt) {
+                if (!(weightObj instanceof Number)) {
+                    System.err.println("Warning: Weight not numeric in '" + path + "': " + weightObj);
+                    continue;
+                }
+                if (!(minObj instanceof Number) || !(maxObj instanceof Number)) {
+                    System.err.println("Warning: min/max not numeric in '" + path + "': min=" + minObj + ", max=" + maxObj);
+                    continue;
+                }
+
+                int weight = ((Number) weightObj).intValue();
+                if (weight <= 0) {
+                    continue;
+                }
+
+                double min = ((Number) minObj).doubleValue();
+                double max = ((Number) maxObj).doubleValue();
+
+                boolean intRange = (minObj instanceof Integer || minObj instanceof Long)
+                        && (maxObj instanceof Integer || maxObj instanceof Long);
+
+                if (max < min) {
+                    System.err.println("Warning: max < min in '" + path + "': " + item);
+                    continue;
+                }
+
+                if (intRange) {
                     for (int i = (int) min; i <= (int) max; i++) {
+                        //noinspection unchecked
                         weights.put((T) Integer.valueOf(i), weight);
                     }
                 } else {
-                    for (double i = min; i <= max; i++) {
-                        weights.put((T) Double.valueOf(i), weight);
+                    for (double d = min; d <= max + 1e-9; d += 1.0) {
+                        // coarse stepping
+                        //noinspection unchecked
+                        weights.put((T) Double.valueOf(d), weight);
                     }
                 }
+            }
+            return weights;
+        }
+
+        // Fall back to key->weight section (rarity / slots style)
+        ConfigurationSection section = config.getConfigurationSection(path);
+        if (section == null) {
+            return weights;
+        }
+        Map<String, Object> directValues = section.getValues(false);
+        for (Map.Entry<String, Object> entry : directValues.entrySet()) {
+            Object val = entry.getValue();
+            if (val instanceof Number) {
+                int weight = ((Number) val).intValue();
+                if (weight > 0) {
+                    //noinspection unchecked
+                    weights.put((T) entry.getKey(), weight);
+                }
+            } else {
+                System.err.println("Warning: Expected numeric value for '" + entry.getKey() + "' in '" + path + "', got " + (val == null ? "null" : val.getClass().getSimpleName()));
             }
         }
         return weights;
     }
 
     public static <T> T selectWeightedRandomValue(Map<T, Integer> weights) {
+        if (weights == null || weights.isEmpty()) {
+            throw new IllegalArgumentException("Weights map cannot be null or empty for weighted random selection.");
+        }
         int totalWeight = weights.values().stream().mapToInt(Integer::intValue).sum();
+        if (totalWeight <= 0) {
+            throw new IllegalArgumentException("Total weight must be positive for weighted random selection.");
+        }
         int randomIndex = ThreadLocalRandom.current().nextInt(totalWeight);
         for (Map.Entry<T, Integer> entry : weights.entrySet()) {
             randomIndex -= entry.getValue();
@@ -58,14 +108,26 @@ public class HRandom {
                 return entry.getKey();
             }
         }
-        throw new IllegalStateException("Something went wrong with the weighted random selection");
+        throw new IllegalStateException("Something went wrong with the weighted random selection calculation. Total weight: " + totalWeight);
     }
 
     public static <T extends Comparable<T>> T selectWeightedRandomValue(Map<T, Integer> weights, T minValue) {
+        if (weights == null || weights.isEmpty()) {
+            throw new IllegalArgumentException("Weights map cannot be null or empty for weighted random selection.");
+        }
+        if (minValue == null) {
+            return selectWeightedRandomValue(weights);
+        }
+
         int totalWeight = weights.entrySet().stream()
                 .filter(entry -> entry.getKey().compareTo(minValue) >= 0)
                 .mapToInt(Map.Entry::getValue)
                 .sum();
+
+        if (totalWeight <= 0) {
+            throw new IllegalStateException("No valid items found above minLevel " + minValue + " or total weight is not positive.");
+        }
+
         int randomIndex = ThreadLocalRandom.current().nextInt(totalWeight);
         for (Map.Entry<T, Integer> entry : weights.entrySet()) {
             if (entry.getKey().compareTo(minValue) >= 0) {
@@ -75,6 +137,6 @@ public class HRandom {
                 }
             }
         }
-        throw new IllegalStateException("Something went wrong with the weighted random selection");
+        throw new IllegalStateException("Something went wrong with the weighted random selection (with minValue). Total weight: " + totalWeight + ", minValue: " + minValue);
     }
 }

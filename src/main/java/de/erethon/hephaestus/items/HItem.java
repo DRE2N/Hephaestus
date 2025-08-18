@@ -91,7 +91,7 @@ public class HItem {
     public HItem(ResourceLocation key, Item baseItem, DataComponentPatch patch) {
         this.key = key;
         this.baseItem = baseItem;
-        this.patch = patch;
+        this.patch = sanitizePatch(patch == null ? DataComponentPatch.EMPTY : patch);
         this.file = null;
     }
 
@@ -132,25 +132,21 @@ public class HItem {
     }
 
     public HItemStack rollRandomStack(int minLevel) {
-        HItemStack hStack = new HItemStack(this);
-        hStack.update();
-
+        HItemStack hStack = new HItemStack(this); // visuals now auto-init
         int level = 0;
         if (levelWeights != null && !levelWeights.isEmpty()) {
             level = HRandom.selectWeightedRandomValue(levelWeights, minLevel);
             hStack.setItemLevel(level);
         }
-
         Map<String, Integer> rarityWeightsForLevel = rarityWeights.getOrDefault(level, new HashMap<>());
         if (!rarityWeightsForLevel.isEmpty()) {
             hStack.setRarity(HRarity.valueOf(HRandom.selectWeightedRandomValue(rarityWeightsForLevel).toUpperCase(Locale.ROOT)));
         }
-
         Map<Integer, Integer> slotWeightsForLevel = slotWeights.getOrDefault(level, new HashMap<>());
         if (!slotWeightsForLevel.isEmpty()) {
             hStack.setMaxUpgrades(HRandom.selectWeightedRandomValue(slotWeightsForLevel));
         }
-
+        hStack.updateVisuals(); // ensure final display reflects randomized data
         return hStack;
     }
 
@@ -229,7 +225,7 @@ public class HItem {
     }
 
     public DataComponentPatch getPatch() {
-        return patch;
+        return patch == null ? DataComponentPatch.EMPTY : patch;
     }
 
     public Set<String> getAllowedUpgrades() {
@@ -305,6 +301,7 @@ public class HItem {
         if (config.contains("patch")) {
             try {
                 patch = deserialize(config.getString("patch"));
+                patch = sanitizePatch(patch); // ensure no CUSTOM_DATA kept
             } catch (Exception e) {
                 plugin.getLogger().warning("Error loading patch for item " + key + ": " + e.getMessage() + ", Data: " + config.getString("patch"));
                 return;
@@ -330,6 +327,7 @@ public class HItem {
             this.tags.addAll(tags);
         }
         levelWeights = HRandom.loadWeights(config, "random.level");
+        plugin.getLogger().info("Loaded " + levelWeights.size() + " level weights for item " + key);
         // Load level-specific rarity and slot weights
         if (config.contains("random.rarity")) {
             var levelSpecificRaritySection = config.getConfigurationSection("random.rarity");
@@ -345,6 +343,10 @@ public class HItem {
                 slotWeights.put(level, HRandom.loadWeights(config, "random.slots." + levelKey));
             }
         }
+        // Ensure patch not null after load
+        if (patch == null) {
+            patch = DataComponentPatch.EMPTY;
+        }
     }
 
     public void save(File file) {
@@ -359,31 +361,25 @@ public class HItem {
             if (patch == null) {
                 patch = DataComponentPatch.EMPTY;
             }
-
             DataComponentMap defaultComponents = baseItem.components();
             DataComponentPatch.Builder defaultBuilder = DataComponentPatch.builder();
             for (TypedDataComponent component : defaultComponents) {
                 defaultBuilder.set(component.type(), defaultComponents.get(component.type()));
             }
-            // Add a custom data tag to the item, so we can identify it as a custom item if needed
-            if (!(key.getNamespace().equals("minecraft"))) {
+            // Build a SERIALIZATION-ONLY variant including CUSTOM_DATA (do NOT mutate field 'patch')
+            DataComponentPatch patchToSave = patch;
+            if (!key.getNamespace().equals("minecraft")) {
                 CompoundTag tag = new CompoundTag();
                 tag.putString("hephaestus-id", key.toString());
-                DataComponentPatch.Builder customDataBuilder = DataComponentPatch.builder();
-                customDataBuilder.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-                customDataBuilder.copy(patch);
-                patch = customDataBuilder.build();
+                DataComponentPatch.Builder tmp = DataComponentPatch.builder();
+                tmp.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+                tmp.copy(patch); // original patch contents
+                patchToSave = tmp.build();
             }
-
             DataComponentPatch defaultPatch = defaultBuilder.build();
-
-            // This is used for reference, so we can copy things we want to change to our patch
             config.set("vanilla", serialize(defaultPatch));
-            config.setComments("vanilla", List.of("JSON representation of the item's vanilla default data components.",
-                    "This is never applied. Copy/paste values to the patch below to modify the item's properties."));
-
-            // This contains our changes
-            config.set("patch", serialize(patch));
+            // Use patchToSave (with id) for file output; runtime 'patch' stays sanitized (no CUSTOM_DATA)
+            config.set("patch", serialize(patchToSave));
             config.setComments("patch", List.of("Our patch, as JSON. This is used to actually modify the item",
                     "See https://minecraft.wiki/w/Data_component_format for all possible components.",
                     "Components here will override vanilla components."));
@@ -435,5 +431,19 @@ public class HItem {
         element.remove("DataVersion"); // This is not a component, so we can't deserialize it
         return DataComponentPatch.CODEC.decode(ops, element).getOrThrow().getFirst();
     }
+
+    private DataComponentPatch sanitizePatch(DataComponentPatch original) {
+        if (original == null || original == DataComponentPatch.EMPTY) {
+            return original;
+        }
+        boolean hasCustom = original.entrySet().stream().anyMatch(e -> e.getKey() == DataComponents.CUSTOM_DATA);
+        if (!hasCustom) {
+            return original;
+        }
+        DataComponentPatch sanitized = original.forget(type -> type == DataComponents.CUSTOM_DATA);
+        plugin.getLogger().fine("Stripped CUSTOM_DATA from patch for " + key);
+        return sanitized;
+    }
+
 
 }

@@ -7,6 +7,8 @@ import de.erethon.hephaestus.utils.HUpgradeResult;
 import io.papermc.paper.adventure.PaperAdventure;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -15,7 +17,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
-import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -41,7 +42,6 @@ public class HItemStack {
     public HItemStack(HItem item) {
         this.item = item;
         stack = new ItemStack(item.getBaseItem());
-        stack.applyComponents(item.getPatch());
         update();
     }
 
@@ -49,10 +49,9 @@ public class HItemStack {
         this.stack = stack;
         this.item = item;
         loadDataFromNBT();
-        if (item == null) { // Handle deleted items
+        if (item == null) {
             return;
         }
-        stack.applyComponents(item.getPatch());
         update();
     }
 
@@ -60,7 +59,6 @@ public class HItemStack {
         this.item = item;
         this.stack = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(stack);
         loadDataFromNBT();
-        this.stack.applyComponents(item.getPatch());
         update();
     }
 
@@ -69,7 +67,12 @@ public class HItemStack {
     }
 
     public org.bukkit.inventory.ItemStack getBukkitStack() {
-        return org.bukkit.craftbukkit.inventory.CraftItemStack.asBukkitCopy(stack);
+        stack.applyComponents(item.getPatch());
+        saveChanges();
+        if (!item.isVanilla()) {
+            updateVisuals();
+        }
+        return org.bukkit.craftbukkit.inventory.CraftItemStack.asCraftMirror(stack);
     }
 
     public HItem getItem() {
@@ -79,6 +82,7 @@ public class HItemStack {
     public void setItemLevel(int itemLevel) {
         this.itemLevel = itemLevel;
         saveChanges();
+        updateVisuals();
     }
 
     public int getItemLevel() {
@@ -88,6 +92,7 @@ public class HItemStack {
     public void setRarity(HRarity rarity) {
         this.rarity = rarity;
         saveChanges();
+        updateVisuals();
     }
 
     public HRarity getRarity() {
@@ -97,6 +102,7 @@ public class HItemStack {
     public void setMaxUpgrades(int maxUpgrades) {
         this.maxUpgrades = maxUpgrades;
         saveChanges();
+        updateVisuals();
     }
 
     public int getMaxUpgrades() {
@@ -146,6 +152,7 @@ public class HItemStack {
         }
         upgrades.add(rolledUpgrade);
         saveChanges();
+        updateVisuals();
         item.getPlugin().getLogger().info("Added upgrade " + rolledUpgrade.getId() + " to item " + item.getKey());
         return HUpgradeResult.SUCCESS;
     }
@@ -161,22 +168,25 @@ public class HItemStack {
     }
 
     public List<HRolledUpgrade> getUpgrades() {
-        return new ArrayList<>(upgrades); // Return a copy to prevent modification, changes won't be saved
+        return new ArrayList<>(upgrades);
     }
 
     public HItemStack update() {
-        stack.applyComponents(item.getPatch());
         if (stack.getItem() != item.getBaseItem()) {
-            stack.setItem(item.getBaseItem()); // Is there a better way?
+            stack.setItem(item.getBaseItem());
         }
-        CompoundTag compoundTag;
-        if (stack.has(DataComponents.CUSTOM_DATA)) {
-            compoundTag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe();
-        } else {
-            compoundTag = new CompoundTag();
+        stack.applyComponents(item.getPatch());
+        CompoundTag custom = stack.has(DataComponents.CUSTOM_DATA)
+                ? stack.get(DataComponents.CUSTOM_DATA).getUnsafe()
+                : new CompoundTag();
+        if (custom.getString("hephaestus-id").isEmpty()) {
+            custom.putString("hephaestus-id", item.getKey().toString());
         }
-        compoundTag.putString("hephaestus-id", item.getKey().toString());
-        CustomData.set(DataComponents.CUSTOM_DATA, stack, compoundTag);
+        CustomData.set(DataComponents.CUSTOM_DATA, stack, custom);
+        saveChanges();
+        if (!item.isVanilla()) {
+            updateVisuals();
+        }
         return this;
     }
 
@@ -184,7 +194,6 @@ public class HItemStack {
         if (item.isVanilla()) {
             return;
         }
-        // Update name
         String id =  item.getKey().toString().replace(":", ".");
         net.minecraft.network.chat.Component nameComponent = net.minecraft.network.chat.Component.translatable("hephaestus.item." + id + ".name");
         if (!playerAddedName.isEmpty()) {
@@ -192,71 +201,84 @@ public class HItemStack {
             nameComponent = PaperAdventure.asVanilla(advComponent);
         }
         stack.set(DataComponents.ITEM_NAME, nameComponent);
-        // Construct lore
-        // ---- Name ----
-        // Level | Category | Rarity
-        // flavour text
-        //
-        // Upgrade lore lines
         List<net.minecraft.network.chat.Component> lore = new ArrayList<>();
-        if (itemLevel != 0) { // Only item levels get the fancy header
+        if (itemLevel != 0) {
             Component verticalLine = Component.text(" | ", NamedTextColor.DARK_GRAY);
             Component header = Component.text(itemLevel, NamedTextColor.GOLD).append(verticalLine)
-                    .append(Component.translatable("hephaestus.item." + id + ".category"))
+                    .append(Component.translatable("hephaestus.item." + id + ".category", TextColor.color(99, 99, 99)))
                     .append(verticalLine)
                     .append(Component.translatable(rarity.getTranslationKey(), rarity.getColor()));
             lore.add(PaperAdventure.asVanilla(header));
+        } else {
+            Component header = Component.translatable("hephaestus.item." + id + ".category")
+                    .color(rarity.getColor());
+            lore.add(PaperAdventure.asVanilla(header));
         }
-        Component flavourText = Component.translatable("hephaestus.item." + id + ".flavour");
+        Component flavourText = Component.translatable("hephaestus.item." + id + ".flavour")
+                .color(NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false);
         if (!playerAddedFlavourText.isEmpty()) {
             Component advComponent = miniMessage.deserialize(playerAddedFlavourText);
-            flavourText = flavourText.append(advComponent);
+            flavourText = flavourText.append(Component.space()).append(advComponent);
         }
         lore.add(PaperAdventure.asVanilla(flavourText));
         lore.add(PaperAdventure.asVanilla(Component.empty()));
         for (HRolledUpgrade upgrade : upgrades) {
             lore.add(PaperAdventure.asVanilla(upgrade.getLoreLine()));
         }
-
         stack.set(DataComponents.LORE, new ItemLore(lore));
+        saveChanges();
+    }
+
+    public void updateVisuals() {
+        updateVisuals(null);
     }
 
     private void loadDataFromNBT() {
-        if (stack.has(DataComponents.CUSTOM_DATA)) {
-            Optional<CompoundTag> optTag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe().getCompound("hephaestus-data");
-            if (optTag.isEmpty()) {
-                return;
-            }
-            CompoundTag tag = optTag.get();
-            itemLevel = tag.getInt("level").get();
-            rarity = HRarity.valueOf(tag.getString("rarity").get().toUpperCase(Locale.ROOT));
-            maxUpgrades = tag.getInt("maxUpgrades").get();
-            playerAddedName = tag.getString("playerAddedName").get();
-            playerAddedFlavourText = tag.getString("playerAddedFlavourText").get();
-            loadUpgradesFromTag(tag);
-        } else {
-            CompoundTag compoundTag = new CompoundTag();
-            compoundTag.putString("hephaestus-id", item.getKey().toString());
-            CompoundTag upgradesTag = new CompoundTag();
-            saveUpgradesInTag(upgradesTag);
-            compoundTag.put("upgrades", upgradesTag);
-            CustomData.set(DataComponents.CUSTOM_DATA, stack, compoundTag);
+        if (!stack.has(DataComponents.CUSTOM_DATA)) {
+            // Initialize minimal tag with id
+            CompoundTag custom = new CompoundTag();
+            custom.putString("hephaestus-id", item.getKey().toString());
+            CustomData.set(DataComponents.CUSTOM_DATA, stack, custom);
+            return;
         }
+        CompoundTag custom = stack.get(DataComponents.CUSTOM_DATA).getUnsafe();
+        // id is managed elsewhere
+        CompoundTag data = custom.getCompound("hephaestus-data").orElse(null);
+        if (data == null) {
+            return; // keep defaults (0/common)
+        }
+        itemLevel = data.getInt("level").orElse(itemLevel);
+        data.getString("rarity").ifPresent(r -> {
+            try { rarity = HRarity.valueOf(r.toUpperCase(Locale.ROOT)); } catch (Exception ignored) {}
+        });
+        maxUpgrades = data.getInt("maxUpgrades").orElse(maxUpgrades);
+        playerAddedName = data.getString("playerAddedName").orElse(playerAddedName);
+        playerAddedFlavourText = data.getString("playerAddedFlavourText").orElse(playerAddedFlavourText);
+        loadUpgradesFromTag(data);
     }
 
     public void saveChanges() {
-        CompoundTag tag = new CompoundTag();
-        CompoundTag customData = stack.get(DataComponents.CUSTOM_DATA).getUnsafe();
-        tag.putInt("level", itemLevel);
-        tag.putString("rarity", rarity.name());
-        tag.putInt("maxUpgrades", maxUpgrades);
-        tag.putString("playerAddedName", playerAddedName);
-        tag.putString("playerAddedFlavourText", playerAddedFlavourText);
+        CompoundTag custom;
+        if (stack.has(DataComponents.CUSTOM_DATA)) {
+            custom = stack.get(DataComponents.CUSTOM_DATA).getUnsafe();
+        } else {
+            custom = new CompoundTag();
+        }
+        if (!custom.getString("hephaestus-id").isPresent() && item != null) {
+            custom.putString("hephaestus-id", item.getKey().toString());
+        }
+        CompoundTag data = custom.getCompound("hephaestus-data").orElse(new CompoundTag());
+        data.putInt("level", itemLevel);
+        data.putString("rarity", rarity.name());
+        data.putInt("maxUpgrades", maxUpgrades);
+        data.putString("playerAddedName", playerAddedName);
+        data.putString("playerAddedFlavourText", playerAddedFlavourText);
         CompoundTag upgradesTag = new CompoundTag();
         saveUpgradesInTag(upgradesTag);
-        tag.put("upgrades", upgradesTag);
-        customData.put("hephaestus-data", tag);
-        CustomData.set(DataComponents.CUSTOM_DATA, stack, customData); // seems broken
+        data.put("upgrades", upgradesTag);
+        custom.put("hephaestus-data", data);
+        CustomData.set(DataComponents.CUSTOM_DATA, stack, custom);
     }
 
     private void saveUpgradesInTag(CompoundTag tag) {
@@ -266,7 +288,11 @@ public class HItemStack {
     }
 
     private void loadUpgradesFromTag(CompoundTag compoundTag) {
-        CompoundTag upgradeTag = compoundTag.getCompound("upgrades").get();
+        Optional<CompoundTag> optUpgrades = compoundTag.getCompound("upgrades");
+        if (optUpgrades.isEmpty()) {
+            return;
+        }
+        CompoundTag upgradeTag = optUpgrades.get();
         for (String key : upgradeTag.keySet()) {
             HRolledUpgrade upgrade = HRolledUpgrade.fromNBT(this, upgradeTag.getCompound(key).get());
             if (upgrade != null) {
@@ -284,7 +310,9 @@ public class HItemStack {
             key = vanillaKey;
         } else {
             CompoundTag tag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe(); // Avoid copy
-            key = ResourceLocation.parse(tag.getString("hephaestus-id").get());
+            Optional<String> optId = tag.getString("hephaestus-id");
+            // Fallback to vanilla key if no Hephaestus ID is present
+            key = optId.map(ResourceLocation::parse).orElse(vanillaKey);
         }
         HItem item = Hephaestus.INSTANCE.getLibrary().get(key);
         if (item == null) { // If deleted, return vanilla item
