@@ -49,6 +49,14 @@ public class HItemUpgrade {
         return null;
     }
 
+    /**
+     * Roll this upgrade as if at the provided level (may differ from the target item's level, e.g. orb level).
+     * Default implementation delegates to roll(HItemStack) ignoring custom level.
+     */
+    public HRolledUpgrade rollAtLevel(HItemStack stack, int level) {
+        return roll(stack);
+    }
+
     public void update(HItemStack stack) {}
 
     public Set<String> getIncompatibleUpgrades() {

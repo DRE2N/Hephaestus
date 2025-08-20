@@ -1,0 +1,125 @@
+# The key of the item. This is used to identify the item in the game, e.g. in /give
+# This should be unique and follow the format namespace:path.
+# Our regular custom items use the namespace 'erethon'.
+key: erethon:test
+baseItem: minecraft:feather
+name:
+  de: Testfeder
+  en: Testing feather
+category:
+  de: Test-Items
+  en: Testing Items
+flavour:
+  de: Testing item DE
+  en: Testing item
+vanilla: |-
+  {
+    "minecraft:item_name": {
+      "translate": "item.minecraft.feather"
+    },
+    "minecraft:enchantments": {},
+    "minecraft:item_model": "minecraft:feather",
+    "minecraft:max_stack_size": 64,
+    "minecraft:rarity": "common",
+    "minecraft:attribute_modifiers": [],
+    "minecraft:lore": [],
+    "minecraft:tooltip_display": {},
+    "minecraft:break_sound": "minecraft:entity.item.break",
+    "minecraft:repair_cost": 0,
+    "DataVersion": 4438
+  }
+# Patch intentionally minimal – attributes come from inserted orbs
+patch: |-
+  {
+    "minecraft:max_stack_size": 1,
+    "DataVersion": 4438
+  }
+random:
+  level:
+    - min: 1
+      max: 5
+      weight: 100
+    - min: 6
+      max: 10
+      weight: 70
+    - min: 11
+      max: 15
+      weight: 40
+    - min: 16
+      max: 20
+      weight: 15
+  rarity:
+    1:
+      TRASH: 5
+      COMMON: 100
+      UNCOMMON: 30
+      RARE: 5
+      EPIC: 0
+      LEGENDARY: 0
+      MYTHIC: 0
+    5:
+      TRASH: 2
+      COMMON: 70
+      UNCOMMON: 50
+      RARE: 20
+      EPIC: 5
+      LEGENDARY: 0
+      MYTHIC: 0
+    10:
+      TRASH: 0
+      COMMON: 40
+      UNCOMMON: 60
+      RARE: 40
+      EPIC: 15
+      LEGENDARY: 2
+      MYTHIC: 0
+    15:
+      TRASH: 0
+      COMMON: 20
+      UNCOMMON: 40
+      RARE: 50
+      EPIC: 30
+      LEGENDARY: 10
+      MYTHIC: 1
+    20:
+      TRASH: 0
+      COMMON: 5
+      UNCOMMON: 20
+      RARE: 40
+      EPIC: 50
+      LEGENDARY: 30
+      MYTHIC: 5
+  # New socket pattern weights (replaces legacy slots). Pattern strings choose colors per rarity/level.
+  socketPatterns:
+    common:
+      1:
+        R: 40    # Single red
+        G: 40    # Single green
+        B: 20    # Single blue (rarer)
+      10:
+        RG: 30   # Two sockets (Red,Green)
+        RB: 30
+        GB: 30
+        P: 10    # Single prismatic (rare)
+    uncommon:
+      10:
+        RGP: 20  # Red, Green, Prismatic
+        RBP: 20
+        GBP: 20
+        RBG: 40  # Three basics
+    rare:
+      15:
+        RBG: 30
+        RBP: 20
+        RGP: 20
+        GBP: 20
+        PRP: 10  # Two prismatics + red
+    epic:
+      20:
+        RBG: 25
+        RGP: 20
+        RBP: 20
+        GBP: 15
+        PRP: 10
+        PGP: 10
+        PBP: 10

@@ -1,0 +1,167 @@
+# The key of the item. This is used to identify the item in the game, e.g. in /give
+# This should be unique and follow the format namespace:path.
+# Our regular custom items use the namespace 'erethon'.
+key: erethon:upg
+# The base item this custom item is based on. If this is a vanilla item, this will be the vanilla item.
+baseItem: minecraft:feather
+# JSON representation of the item's vanilla default data components.
+# This is never applied. Copy/paste values to the patch below to modify the item's properties.
+name:
+  de: Orb
+  en: Ooorb
+category:
+  de: Orb
+  en: Orb
+flavour:
+  de: Ohh
+  en: Ahh
+orbColor: red
+grantedUpgrade: testing_upgrade
+vanilla: |-
+  {
+    "minecraft:item_name": {
+      "translate": "item.minecraft.feather"
+    },
+    "minecraft:enchantments": {},
+    "minecraft:item_model": "minecraft:feather",
+    "minecraft:max_stack_size": 64,
+    "minecraft:rarity": "common",
+    "minecraft:attribute_modifiers": [],
+    "minecraft:lore": [],
+    "minecraft:tooltip_display": {},
+    "minecraft:break_sound": "minecraft:entity.item.break",
+    "minecraft:repair_cost": 0,
+    "DataVersion": 4438
+  }
+# Our patch, as JSON. This is used to actually modify the item
+# See https://minecraft.wiki/w/Data_component_format for all possible components.
+# Components here will override vanilla components.
+# Main configuration for random level, rarity, and slot generation
+random:
+  # Defines the weighted probabilities for rolling an item's level.
+  # Levels are grouped into ranges with associated weights.
+  # Maximum level is 20.
+  level:
+    # Levels 1-5 are most common
+    - min: 1
+      max: 5
+      weight: 100
+    # Levels 6-10 are less common than lower levels
+    - min: 6
+      max: 10
+      weight: 70
+    # Levels 11-15 become rarer
+    - min: 11
+      max: 15
+      weight: 40
+    # Levels 16-20 are the rarest
+    - min: 16
+      max: 20
+      weight: 15
+
+  # Defines the weighted probabilities for rolling an item's rarity,
+  # specific to different item levels.
+  rarity:
+    # Rarity weights for items with Level 1
+    # Very high chance for COMMON, low for UNCOMMON, almost no RARE+
+    1:
+      TRASH: 5
+      COMMON: 100
+      UNCOMMON: 30
+      RARE: 5
+      EPIC: 0
+      LEGENDARY: 0
+      MYTHIC: 0
+    
+    # Rarity weights for items with Level 5
+    # Still common, but UNCOMMON and RARE become more probable
+    5:
+      TRASH: 2
+      COMMON: 70
+      UNCOMMON: 50
+      RARE: 20
+      EPIC: 5
+      LEGENDARY: 0
+      MYTHIC: 0
+
+    # Rarity weights for items with Level 10
+    # COMMON still present, but UNCOMMON and RARE are very likely,
+    # with a chance for EPIC
+    10:
+      TRASH: 0
+      COMMON: 40
+      UNCOMMON: 60
+      RARE: 40
+      EPIC: 15
+      LEGENDARY: 2
+      MYTHIC: 0
+
+    # Rarity weights for items with Level 15
+    # Higher chance for RARE and EPIC, with some LEGENDARY appearing
+    15:
+      TRASH: 0
+      COMMON: 20
+      UNCOMMON: 40
+      RARE: 50
+      EPIC: 30
+      LEGENDARY: 10
+      MYTHIC: 1
+
+    # Rarity weights for items with Max Level (20)
+    # High chance for EPIC and LEGENDARY, with a rare chance for MYTHIC
+    20:
+      TRASH: 0
+      COMMON: 5
+      UNCOMMON: 20
+      RARE: 40
+      EPIC: 50
+      LEGENDARY: 30
+      MYTHIC: 5
+
+  # Defines the weighted probabilities for the number of "orb slots"
+  # (max upgrades) an item can have, specific to different item levels.
+  slots:
+    # Slot weights for items with Level 1
+    # Mostly 0 or 1 slot
+    1:
+      - min: 0
+        max: 0
+        weight: 50 # 0 slots
+      - min: 1
+        max: 1
+        weight: 30 # 1 slot
+      - min: 2
+        max: 2
+        weight: 5  # 2 slots (rare)
+
+    # Slot weights for items with Level 10
+    # More likely to have 1 or 2 slots, with a chance for 3 or 4
+    10:
+      - min: 1
+        max: 1
+        weight: 40
+      - min: 2
+        max: 2
+        weight: 60
+      - min: 3
+        max: 3
+        weight: 20
+      - min: 4
+        max: 4
+        weight: 5
+
+    # Slot weights for items with Max Level (20)
+    # Higher chance for 3 or 4 slots, with a rare chance for 5
+    20:
+      - min: 2
+        max: 2
+        weight: 30
+      - min: 3
+        max: 3
+        weight: 50
+      - min: 4
+        max: 4
+        weight: 25
+      - min: 5
+        max: 5
+        weight: 5

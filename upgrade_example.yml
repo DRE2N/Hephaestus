@@ -1,0 +1,49 @@
+# Example attribute-modifying upgrade definition for the new orb socket system
+# Copy & adapt this file (change id) for new upgrades.
+
+id: testing_upgrade
+# Registered upgrade type key (see HItemUpgrade static registration)
+type: attribute_modifying
+
+# Optional display names (translation keys still registered, though lore omits names in orb view)
+name:
+  en_us: Power Core
+  de_de: Energiekern
+
+minimumLevel: 0
+
+# Attribute value roll tables per item level.
+# Format:
+# attributes:
+#   <bukkit_attribute_registry_path>:
+#     <item_level_floor>: { <rolled_value>: <weight>, ... }
+# The loader picks an exact level mapping or the nearest lower defined level.
+# Use vanilla / Paper attribute keys (minecraft namespace implied):
+#   max_health, attack_damage, armor, armor_toughness, movement_speed, attack_speed, luck, knockback_resistance, attack_knockback
+attributes:
+  max_health:
+    0:
+      2: 60   # 60% chance for +2
+      3: 30
+      4: 10
+    20:
+      4: 50
+      5: 35
+      6: 15
+  advantage_physical:
+    0:
+      1: 70
+      2: 25
+      3: 5
+    30:
+      2: 50
+      3: 35
+      4: 15
+
+# Optional constraints (uncomment as needed)
+# validItems:
+#   - erethon:crystal_chestplate
+# incompatibleUpgrades:
+#   - other_upgrade_id
+# requiredUpgrades:
+#   - prerequisite_upgrade_id
