@@ -14,7 +14,9 @@ import de.erethon.hephaestus.items.interactions.HItemDropAction;
 import de.erethon.hephaestus.items.interactions.HItemEquipAction;
 import de.erethon.hephaestus.items.interactions.HItemInteractAction;
 import de.erethon.hephaestus.items.interactions.HItemUnequipAction;
+import de.erethon.hephaestus.items.orbs.OrbColor;
 import de.erethon.hephaestus.utils.HRandom;
+import de.erethon.spellbook.api.SpellData;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentPatch;
@@ -37,12 +39,14 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.CraftRegistry;
 import org.bukkit.craftbukkit.CraftSound;
+import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -64,6 +68,10 @@ public class HItem {
     private SoundEvent placementSound = null;
     private final Set<String> allowedUpgrades = new HashSet<>();
     private final Set<String> tags = new HashSet<>();
+    // Orb system
+    private final List<OrbColor> socketColors = new ArrayList<>();
+    private OrbColor orbColor = null; // if this item is an orb itself
+    private String grantedUpgradeId = null; // upgrade granted when inserted
 
     // Blocks
     private float breakSpeedModifier = 1.0f;
@@ -72,12 +80,16 @@ public class HItem {
     private Map<Integer, Integer> levelWeights = new HashMap<>();
     private Map<Integer, Map<String, Integer>> rarityWeights = new HashMap<>();
     private Map<Integer, Map<Integer, Integer>> slotWeights = new HashMap<>();
+    private Map<HRarity, Map<Integer, Map<String, Integer>>> socketPatternWeights = new HashMap<>();
 
     // Interactions
     private final Set<HItemInteractAction> interactActions = new HashSet<>();
     private final Set<HItemEquipAction> equipActions = new HashSet<>();
     private final Set<HItemUnequipAction> unequipActions = new HashSet<>();
     private final Set<HItemDropAction> dropActions = new HashSet<>();
+
+    // Spells (mostly used for Jobs right now)
+    private final Set<SpellData> rightClickSpells = new HashSet<>();
 
     public HItem(File file) {
         this.file = file;
@@ -127,6 +139,10 @@ public class HItem {
         dropActions.forEach(action -> action.onDrop(stack, event));
     }
 
+    public void runRightClickSpells(Player caster, HItemStack stack) {
+        rightClickSpells.forEach(spell -> spell.getActiveSpell(caster).ready());
+    }
+
     public HItemStack rollRandomStack() {
         return rollRandomStack(0);
     }
@@ -146,6 +162,8 @@ public class HItem {
         if (!slotWeightsForLevel.isEmpty()) {
             hStack.setMaxUpgrades(HRandom.selectWeightedRandomValue(slotWeightsForLevel));
         }
+        // Socket pattern roll (overrides static sockets if defined)
+        applyRandomSocketPattern(hStack, level);
         hStack.updateVisuals(); // ensure final display reflects randomized data
         return hStack;
     }
@@ -205,17 +223,10 @@ public class HItem {
         return tags;
     }
 
-    public boolean hasTag(String tag) {
-        return tags.contains(tag);
-    }
-
-    public void addTag(String tag) {
-        tags.add(tag);
-    }
-
-    public void removeTag(String tag) {
-        tags.remove(tag);
-    }
+    public List<OrbColor> getSocketColors() { return socketColors; }
+    public boolean isOrbItem() { return orbColor != null && grantedUpgradeId != null; }
+    public OrbColor getOrbColor() { return orbColor; }
+    public String getGrantedUpgradeId() { return grantedUpgradeId; }
 
     public @NotNull Sound getPlacementSound() {
         if (placementSound == null) {
@@ -301,7 +312,7 @@ public class HItem {
         if (config.contains("patch")) {
             try {
                 patch = deserialize(config.getString("patch"));
-                patch = sanitizePatch(patch); // ensure no CUSTOM_DATA kept
+                patch = sanitizePatch(patch);
             } catch (Exception e) {
                 plugin.getLogger().warning("Error loading patch for item " + key + ": " + e.getMessage() + ", Data: " + config.getString("patch"));
                 return;
@@ -326,6 +337,24 @@ public class HItem {
             List<String> tags = config.getStringList("tags");
             this.tags.addAll(tags);
         }
+        // Orb sockets on equipment
+        if (config.contains("sockets")) {
+            for (String s : config.getStringList("sockets")) {
+                OrbColor c = OrbColor.fromString(s);
+                if (c != null) socketColors.add(c);
+            }
+        }
+        // Orb item definition
+        if (config.contains("orbColor")) {
+            orbColor = OrbColor.fromString(config.getString("orbColor"));
+        }
+        if (config.contains("grantedUpgrade")) {
+            grantedUpgradeId = config.getString("grantedUpgrade");
+        }
+        if (isOrbItem()) {
+            tags.add("orb");
+        }
+
         levelWeights = HRandom.loadWeights(config, "random.level");
         plugin.getLogger().info("Loaded " + levelWeights.size() + " level weights for item " + key);
         // Load level-specific rarity and slot weights
@@ -343,7 +372,35 @@ public class HItem {
                 slotWeights.put(level, HRandom.loadWeights(config, "random.slots." + levelKey));
             }
         }
-        // Ensure patch not null after load
+        if (config.contains("random.socketPatterns")) {
+            ConfigurationSection spRoot = config.getConfigurationSection("random.socketPatterns");
+            for (String rarityKey : spRoot.getKeys(false)) {
+                HRarity r;
+                try { r = HRarity.valueOf(rarityKey.toUpperCase(Locale.ROOT)); } catch (Exception ex) { continue; }
+                Map<Integer, Map<String,Integer>> perLevel = new HashMap<>();
+                ConfigurationSection raritySection = spRoot.getConfigurationSection(rarityKey);
+                for (String levelKey : raritySection.getKeys(false)) {
+                    int lvl;
+                    try { lvl = Integer.parseInt(levelKey); } catch (NumberFormatException ex) { continue; }
+                    Map<String,Integer> weights = HRandom.loadWeights(config, "random.socketPatterns."+rarityKey+"."+levelKey);
+                    // loadWeights returns Map<String,Integer> but uses generic; ensure only string keys kept
+                    perLevel.put(lvl, new HashMap<>(weights));
+                }
+                socketPatternWeights.put(r, perLevel);
+            }
+        }
+        if (config.contains("rightClickSpells")) {
+            List<String> spells = config.getStringList("rightClickSpells");
+            for (String spell : spells) {
+                SpellData spellData = Bukkit.getServer().getSpellbookAPI().getLibrary().getSpellByID(spell);
+                if (spellData != null) {
+                    rightClickSpells.add(spellData);
+                } else {
+                    plugin.getLogger().warning("Spell not found: " + spell + " for item " + key);
+                }
+            }
+            plugin.getLogger().info("Loaded " + rightClickSpells.size() + " right-click spells for item " + key);
+        }
         if (patch == null) {
             patch = DataComponentPatch.EMPTY;
         }
@@ -366,7 +423,6 @@ public class HItem {
             for (TypedDataComponent component : defaultComponents) {
                 defaultBuilder.set(component.type(), defaultComponents.get(component.type()));
             }
-            // Build a SERIALIZATION-ONLY variant including CUSTOM_DATA (do NOT mutate field 'patch')
             DataComponentPatch patchToSave = patch;
             if (!key.getNamespace().equals("minecraft")) {
                 CompoundTag tag = new CompoundTag();
@@ -378,7 +434,6 @@ public class HItem {
             }
             DataComponentPatch defaultPatch = defaultBuilder.build();
             config.set("vanilla", serialize(defaultPatch));
-            // Use patchToSave (with id) for file output; runtime 'patch' stays sanitized (no CUSTOM_DATA)
             config.set("patch", serialize(patchToSave));
             config.setComments("patch", List.of("Our patch, as JSON. This is used to actually modify the item",
                     "See https://minecraft.wiki/w/Data_component_format for all possible components.",
@@ -396,6 +451,21 @@ public class HItem {
         for (Map.Entry<Integer, Map<Integer, Integer>> entry : slotWeights.entrySet()) {
             config.createSection("random.slots." + entry.getKey(), entry.getValue());
         }
+        for (Map.Entry<HRarity, Map<Integer, Map<String, Integer>>> rarityEntry : socketPatternWeights.entrySet()) {
+            for (Map.Entry<Integer, Map<String,Integer>> lvlEntry : rarityEntry.getValue().entrySet()) {
+                config.createSection("random.socketPatterns."+rarityEntry.getKey().name().toLowerCase(Locale.ROOT)+"."+lvlEntry.getKey(), lvlEntry.getValue());
+            }
+        }
+        if (!socketColors.isEmpty()) {
+            List<String> list = new ArrayList<>();
+            for (OrbColor c : socketColors) list.add(c.name());
+            config.set("sockets", list);
+        }
+        if (isOrbItem()) {
+            config.set("orbColor", orbColor.name());
+            config.set("grantedUpgrade", grantedUpgradeId);
+        }
+        if (!tags.isEmpty()) config.set("tags", new ArrayList<>(tags));
         try {
             config.save(file);
         } catch (IOException e) {
@@ -443,6 +513,27 @@ public class HItem {
         DataComponentPatch sanitized = original.forget(type -> type == DataComponents.CUSTOM_DATA);
         plugin.getLogger().fine("Stripped CUSTOM_DATA from patch for " + key);
         return sanitized;
+    }
+
+    private void applyRandomSocketPattern(HItemStack stack, int level) {
+        if (socketPatternWeights.isEmpty()) return;
+        HRarity rarity = stack.getRarity();
+        Map<Integer, Map<String, Integer>> byLevel = socketPatternWeights.get(rarity);
+        if (byLevel == null || byLevel.isEmpty()) return;
+        // find direct or nearest lower level definition
+        Map<String,Integer> patternMap = byLevel.get(level);
+        if (patternMap == null) {
+            int best = Integer.MIN_VALUE;
+            for (Integer defined : byLevel.keySet()) {
+                if (defined <= level && defined > best) best = defined;
+            }
+            if (best != Integer.MIN_VALUE) patternMap = byLevel.get(best);
+        }
+        if (patternMap == null || patternMap.isEmpty()) return;
+        String pattern = HRandom.selectWeightedRandomValue(patternMap);
+        if (pattern == null || pattern.isBlank()) return;
+        stack.applySocketPattern(pattern);
+        stack.setMaxUpgrades(stack.getSockets().size()); // keep legacy compatibility
     }
 
 

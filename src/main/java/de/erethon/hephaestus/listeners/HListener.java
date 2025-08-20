@@ -5,9 +5,12 @@ import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.events.HItemEquipEvent;
 import de.erethon.hephaestus.events.HItemUnequipEvent;
 import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.utils.HUpgradeResult;
 import de.erethon.papyrus.events.ContainerLoadEvent;
 import de.erethon.papyrus.events.PlayerInventoryLoadEvent;
 import io.papermc.paper.datacomponent.DataComponentTypes;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import org.bukkit.entity.Player;
@@ -15,6 +18,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 import java.util.Collections;
@@ -31,7 +36,7 @@ public class HListener implements Listener {
             if (item.isEmpty()) {
                 continue;
             }
-            onItemLoad(item).updateVisuals(player);
+            onItemLoad(item).updateVisuals();
         }
         if (event.equipment == null) { // A player might have no equipment
             return;
@@ -41,7 +46,7 @@ public class HListener implements Listener {
             if (item.isEmpty()) {
                 continue;
             }
-            onItemLoad(item).updateVisuals(player);
+            onItemLoad(item).updateVisuals();
         }
     }
 
@@ -63,7 +68,7 @@ public class HListener implements Listener {
         if (event.getItem().getItemStack().getType() == org.bukkit.Material.AIR) {
             return;
         }
-        onItemLoad(event.getItem().getItemStack()).updateVisuals(player);
+        onItemLoad(event.getItem().getItemStack()).updateVisuals();
     }
 
     @EventHandler
@@ -116,6 +121,42 @@ public class HListener implements Listener {
             return;
         }
         stack.getItem().runInteractActions(stack, event);
+        if (event.getAction().isRightClick()) {
+            stack.getItem().runRightClickSpells(event.getPlayer(), stack);
+        }
+    }
+
+    @EventHandler
+    private void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        org.bukkit.inventory.ItemStack cursor = event.getCursor();
+        org.bukkit.inventory.ItemStack current = event.getCurrentItem();
+        if (cursor == null || current == null) return;
+        if (cursor.getType() == org.bukkit.Material.AIR) return;
+        if (current.getType() == org.bukkit.Material.AIR) return;
+        // Only handle normal placement (not shift-click moving stacks etc.)
+        if (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT) return;
+        HItemStack orbStack = Hephaestus.getStack(cursor);
+        HItemStack targetStack = Hephaestus.getStack(current);
+        if (orbStack == null || targetStack == null || orbStack.getItem() == null) return;
+        if (!orbStack.getItem().isOrbItem()) return;
+        if (!targetStack.hasSockets()) return;
+        HUpgradeResult result = targetStack.insertOrb(orbStack);
+        if (result == HUpgradeResult.SUCCESS) {
+            int amt = cursor.getAmount();
+            if (amt <= 1) {
+                event.setCursor(new org.bukkit.inventory.ItemStack(org.bukkit.Material.AIR));
+            } else {
+                cursor.setAmount(amt - 1);
+                event.setCursor(cursor);
+            }
+            event.setCurrentItem(targetStack.getBukkitStack());
+            player.sendMessage(Component.text("Socketed orb!", NamedTextColor.GREEN));
+            event.setCancelled(true);
+            return;
+        }
+        player.sendMessage(Component.translatable(result.toString()));
+        event.setCancelled(true);
     }
 
     private HItemStack onItemLoad(ItemStack item) {
