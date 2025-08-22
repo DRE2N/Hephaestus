@@ -1,5 +1,5 @@
-
-import java.io.FileInputStream
+import org.gradle.api.tasks.javadoc.Javadoc
+import org.gradle.external.javadoc.StandardJavadocDocletOptions
 
 repositories {
     mavenLocal()
@@ -21,6 +21,8 @@ description = "Items"
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    withSourcesJar()
+    withJavadocJar()
 }
 
 val papyrusVersion = "1.21.7-R0.1-SNAPSHOT"
@@ -46,6 +48,13 @@ tasks {
     }
     processResources {
         filteringCharset = Charsets.UTF_8.name()
+    }
+
+    withType<Javadoc> {
+        options.encoding = Charsets.UTF_8.name()
+        (options as StandardJavadocDocletOptions).addBooleanOption("Xdoclint:none", true)
+        (options as StandardJavadocDocletOptions).locale = "en"
+        isFailOnError = false
     }
 
     jar {

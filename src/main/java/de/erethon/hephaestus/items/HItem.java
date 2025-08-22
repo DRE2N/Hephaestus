@@ -43,6 +43,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -143,10 +144,23 @@ public class HItem {
         rightClickSpells.forEach(spell -> spell.getActiveSpell(caster).ready());
     }
 
+    /**
+     * Rolls a random item stack of this item, using the configured level weights and rarity weights.
+     * The level is determined by the level weights, and the rarity is determined by the rarity weights for that level.
+     * The socket pattern is also applied based on the rarity and level.
+     * @return a new HItemStack with random properties based on this item
+     */
     public HItemStack rollRandomStack() {
         return rollRandomStack(0);
     }
 
+    /**
+     * Rolls a random item stack of this item, using the configured level weights and rarity weights.
+     * The level is determined by the level weights, and the rarity is determined by the rarity weights for that level.
+     * The socket pattern is also applied based on the rarity and level.
+     * @param minLevel the minimum level to roll, used to ensure the item is at least this level
+     * @return a new HItemStack with random properties based on this item
+     */
     public HItemStack rollRandomStack(int minLevel) {
         HItemStack hStack = new HItemStack(this); // visuals now auto-init
         int level = 0;
@@ -162,72 +176,172 @@ public class HItem {
         if (!slotWeightsForLevel.isEmpty()) {
             hStack.setMaxUpgrades(HRandom.selectWeightedRandomValue(slotWeightsForLevel));
         }
-        // Socket pattern roll (overrides static sockets if defined)
         applyRandomSocketPattern(hStack, level);
-        hStack.updateVisuals(); // ensure final display reflects randomized data
+        hStack.updateVisuals();
         return hStack;
     }
 
+    /**
+     * Creates a new item stack of this item with the default amount of 1.
+     * @return a new HItemStack with the default amount
+     */
     public HItemStack createStack() {
         return createStack(1);
     }
 
+    /**
+     * Creates a new item stack of this item with the given amount.
+     * @param amount the amount of items in the stack
+     * @return a new HItemStack with the given amount
+     */
     public HItemStack createStack(int amount) {
         return createStack(amount, 0);
     }
 
-    public  HItemStack createStack(int amount, int level) {
-        return createStack(amount, level, 0);
+    /**
+     * Creates a new item stack of this item with the given amount and level.
+     * @param amount the amount of items in the stack
+     * @param level the item level, used for randomization and rarity
+     * @return a new HItemStack with the given parameters
+     */
+    public HItemStack createStack(int amount, int level) {
+        return createStack(amount, level, null);
     }
 
-    public HItemStack createStack(int amount, int level, int maxUpgrades) {
-        return createStack(amount, level, maxUpgrades, HRarity.COMMON);
+    /**
+     * Creates a new item stack of this item with the given parameters.
+     * @param amount the amount of items in the stack
+     * @param level the item level, used for randomization and rarity
+     * @param socketPattern the socket pattern to apply, or null for no sockets.
+     *                      Pattern: "RGB" for 3 sockets, "RRGGBB" for 6 sockets, etc.
+     *                      R for red, G for green, B for blue, P for prismatic (any color)
+     * @return a new HItemStack with the given parameters
+     */
+    public HItemStack createStack(int amount, int level, String socketPattern) {
+        return createStack(amount, level, socketPattern, HRarity.COMMON);
     }
 
-    public HItemStack createStack(int amount, int level, int maxUpgrades, HRarity rarity) {
+    /**
+     * Creates a new item stack of this item with the given parameters.
+     * @param amount the amount of items in the stack
+     * @param level the item level, used for randomization and rarity
+     * @param socketPattern the socket pattern to apply, or null for no sockets.
+     *                      Pattern: "RGB" for 3 sockets, "RRGGBB" for 6 sockets, etc.
+     *                      R for red, G for green, B for blue, P for prismatic (any color)
+     * @param rarity the rarity of the item, used for randomization and socket patterns.
+     * @return a new HItemStack with the given parameters
+     */
+    public HItemStack createStack(int amount, int level, String socketPattern, HRarity rarity) {
         HItemStack hStack = new HItemStack(this);
         hStack.update();
         hStack.setItemLevel(level);
-        hStack.setMaxUpgrades(maxUpgrades);
         hStack.setRarity(rarity);
+        if (socketPattern != null && !socketPattern.isBlank()) {
+            hStack.applySocketPattern(socketPattern);
+            hStack.setMaxUpgrades(hStack.getSockets().size());
+        }
         hStack.getVanillaStack().setCount(amount);
         return hStack;
     }
 
+    /**
+     * Gets the NMS key of this item, which is a unique identifier in the format namespace:path.
+     * @return the ResourceLocation key of this item
+     */
     public ResourceLocation getKey() {
         return key;
     }
 
+    /**
+     * Gets the Bukkit NamespacedKey of this item, which is used for Bukkit APIs.
+     * This is a conversion from the NMS ResourceLocation to the Bukkit format.
+     * @return the NamespacedKey of this item
+     */
     public NamespacedKey getBukkitKey() {
         return new NamespacedKey(key.getNamespace(), key.getPath());
     }
 
+    /**
+     * Gets the NMS base item this custom item is based on.
+     * This is a vanilla item, and the custom item will have additional properties or modifications.
+     * @return the base Item of this custom item
+     */
     public Item getBaseItem() {
         return baseItem;
     }
 
-    public BlockData getBlockData() {
+    /**
+     * Gets the block data for this item, if it has a block state (e.g. placeable items).
+     * This is used to determine how the item behaves when placed in the world.
+     * @return the BlockData of this item, or null if it does not have a block state
+     */
+    public @Nullable BlockData getBlockData() {
         return blockData;
     }
 
+    /**
+     * Sets the block data for this item, registering it in the block library.
+     * This is used to define how the item behaves when placed in the world.
+     * This will turn the item into a placeable item with a block state.
+     * @param blockData the BlockData to set for this item
+     */
     public void setBlockData(BlockData blockData) {
         this.blockData = blockData;
         plugin.getBlockLibrary().register(this, blockData);
     }
 
+    /**
+     * Gets the modifier for the break speed of blocks when this item is used.
+     * This is a multiplier applied to the break speed, where 1.0 is normal speed.
+     * Only applies to items with a block state
+     * @return the break speed modifier
+     */
     public float getBreakSpeedModifier() {
         return breakSpeedModifier;
     }
 
+    /**
+     * Tags can be used to categorize items, e.g. for filtering who can equip them.
+     * @return a set of tags associated with this item
+     */
     public Set<String> getTags() {
         return tags;
     }
 
+    /**
+     * Gets the colors of the orb sockets on this item.
+     * If this item is an orb item, it will return the color of the orb itself.
+     * If this item has no sockets, it will return an empty list.
+     * @return a list of OrbColor representing the socket colors
+     */
     public List<OrbColor> getSocketColors() { return socketColors; }
-    public boolean isOrbItem() { return orbColor != null && grantedUpgradeId != null; }
-    public OrbColor getOrbColor() { return orbColor; }
-    public String getGrantedUpgradeId() { return grantedUpgradeId; }
 
+    /**
+     * Checks if this item is an orb item.
+     * An orb item has a color and a granted upgrade ID, which is applied when the orb is inserted into a socket.
+     * @return true if this item is an orb item, false otherwise
+     */
+    public boolean isOrbItem() { return orbColor != null && grantedUpgradeId != null; }
+
+    /**
+     * Gets the color of the orb if this item is an orb item.
+     * If this item is not an orb item, this will return null.
+     * @return the OrbColor of the orb, or null if this item is not an orb item
+     */
+    public @Nullable OrbColor getOrbColor() { return orbColor; }
+
+    /**
+     * Gets the ID of the upgrade granted when this orb is inserted into a socket.
+     * If this item is not an orb item, this will return null.
+     * @return the ID of the granted upgrade, or null if this item is not an orb item
+     */
+    public @Nullable String getGrantedUpgradeId() { return grantedUpgradeId; }
+
+    /**
+     * Gets the sound played when this item is placed, if it is placeable (has a block state)
+     * If no custom sound is defined, it defaults to BLOCK_STONE_PLACE.
+     * @return the placement sound
+     */
     public @NotNull Sound getPlacementSound() {
         if (placementSound == null) {
             return Sound.BLOCK_STONE_PLACE;
@@ -239,6 +353,11 @@ public class HItem {
         return patch == null ? DataComponentPatch.EMPTY : patch;
     }
 
+    /**
+     * Gets the allowed upgrades for this item.
+     * This is a set of upgrade IDs that can be applied to this item.
+     * @return a set of allowed upgrade IDs
+     */
     public Set<String> getAllowedUpgrades() {
         return allowedUpgrades;
     }
@@ -251,6 +370,11 @@ public class HItem {
         return plugin;
     }
 
+    /**
+     * Checks if this item is a vanilla item.
+     * A vanilla item has the namespace "minecraft".
+     * @return true if this item is a vanilla item, false otherwise
+     */
     public boolean isVanilla() {
         return key.getNamespace().equals("minecraft");
     }
@@ -533,7 +657,7 @@ public class HItem {
         String pattern = HRandom.selectWeightedRandomValue(patternMap);
         if (pattern == null || pattern.isBlank()) return;
         stack.applySocketPattern(pattern);
-        stack.setMaxUpgrades(stack.getSockets().size()); // keep legacy compatibility
+        stack.setMaxUpgrades(stack.getSockets().size());
     }
 
 
