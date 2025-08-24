@@ -471,7 +471,11 @@ public class HItemStack {
         if (data == null) {
             return;
         }
-        itemLevel = data.getInt("level").get();
+        Optional<Integer> optLevel = data.getInt("level");
+        if (optLevel.isEmpty()) {
+            return;
+        }
+        itemLevel = optLevel.get();
         String rarityStr = data.getString("rarity").orElse(null);
         if (rarityStr != null && !rarityStr.isEmpty()) {
             try { rarity = HRarity.valueOf(rarityStr.toUpperCase(Locale.ROOT)); } catch (Exception ignored) {}

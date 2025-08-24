@@ -92,6 +92,8 @@ public class HItem {
     // Spells (mostly used for Jobs right now)
     private final Set<SpellData> rightClickSpells = new HashSet<>();
 
+    private YamlConfiguration config = null;
+
     public HItem(File file) {
         this.file = file;
         load();
@@ -165,7 +167,7 @@ public class HItem {
         HItemStack hStack = new HItemStack(this); // visuals now auto-init
         int level = 0;
         if (levelWeights != null && !levelWeights.isEmpty()) {
-            level = HRandom.selectWeightedRandomValue(levelWeights, minLevel);
+            level = (int) HRandom.selectWeightedRandomValue(levelWeights, minLevel);
             hStack.setItemLevel(level);
         }
         Map<String, Integer> rarityWeightsForLevel = rarityWeights.getOrDefault(level, new HashMap<>());
@@ -380,7 +382,7 @@ public class HItem {
     }
 
     private void load() {
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+        config = YamlConfiguration.loadConfiguration(file);
         key = ResourceLocation.parse(config.getString("key", "hephaestus:default"));
         if (BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone"))).isPresent()) {
             baseItem = BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone"))).get().value();
@@ -531,7 +533,6 @@ public class HItem {
     }
 
     public void save(File file) {
-        YamlConfiguration config = new YamlConfiguration();
         config.set("key", key.toString());
         config.setComments("key", List.of("The key of the item. This is used to identify the item in the game, e.g. in /give",
                 "This should be unique and follow the format namespace:path.",
@@ -568,28 +569,6 @@ public class HItem {
         if (blockData != null) {
             config.set("placedBlockData", blockData.getAsString());
         }
-        config.createSection("random.level", levelWeights);
-        for (Map.Entry<Integer, Map<String, Integer>> entry : rarityWeights.entrySet()) {
-            config.createSection("random.rarity." + entry.getKey(), entry.getValue());
-        }
-        for (Map.Entry<Integer, Map<Integer, Integer>> entry : slotWeights.entrySet()) {
-            config.createSection("random.slots." + entry.getKey(), entry.getValue());
-        }
-        for (Map.Entry<HRarity, Map<Integer, Map<String, Integer>>> rarityEntry : socketPatternWeights.entrySet()) {
-            for (Map.Entry<Integer, Map<String,Integer>> lvlEntry : rarityEntry.getValue().entrySet()) {
-                config.createSection("random.socketPatterns."+rarityEntry.getKey().name().toLowerCase(Locale.ROOT)+"."+lvlEntry.getKey(), lvlEntry.getValue());
-            }
-        }
-        if (!socketColors.isEmpty()) {
-            List<String> list = new ArrayList<>();
-            for (OrbColor c : socketColors) list.add(c.name());
-            config.set("sockets", list);
-        }
-        if (isOrbItem()) {
-            config.set("orbColor", orbColor.name());
-            config.set("grantedUpgrade", grantedUpgradeId);
-        }
-        if (!tags.isEmpty()) config.set("tags", new ArrayList<>(tags));
         try {
             config.save(file);
         } catch (IOException e) {
