@@ -1,0 +1,167 @@
+# English translations for Hephaestus
+# These translations will be loaded with the key prefix "hephaestus."
+
+# Job System
+job:
+  command:
+    help:
+      header: "=== Job Commands ==="
+      list: "/job list - List all available jobs"
+      info: "/job info <job> - Show information about a job"
+      select: "/job select <job> - Select a job"
+      current: "/job current - Show your current job"
+      leave: "/job leave - Leave your current job"
+      reload: "/job reload - Reload job configuration"
+    list:
+      empty: "No jobs are available."
+      header: "=== Available Jobs ==="
+    info:
+      not_found: "Job '{0}' not found."
+      id: "ID: {0}"
+      description: "Description: {0}"
+      max_level: "Max Level: {0}"
+      allowed_items: "Allowed Items: {0}"
+      player_count: "Players with this job: {0}"
+    select:
+      not_found: "Job '{0}' not found."
+      success: "You have selected the job: {0}"
+      failed: "Failed to select job. Please try again later."
+    current:
+      none: "You don't have a job selected."
+      header: "=== Your Current Job ==="
+      job: "Job: {0}"
+      level: "Level: {0}"
+    leave:
+      none: "You don't have a job to leave."
+      success: "You have left your job."
+      failed: "Failed to leave job. Please try again later."
+    reload:
+      success: "Jobs reloaded successfully."
+      failed: "Failed to reload jobs."
+
+# Crafting System
+crafting:
+  gui:
+    discovery:
+      title: "Recipe Discovery"
+      lore1: "Open the discovery interface"
+      lore2: "to experiment with new recipes"
+      discover:
+        title: "Discover Recipe"
+        lore1: "Place ingredients in the 5 slots"
+        lore2: "and click to discover new recipes!"
+      clear:
+        title: "Clear Ingredients"
+        lore: "Remove all ingredients from discovery slots"
+      crafting:
+        title: "Crafting Station"
+        lore1: "Open the crafting station"
+        lore2: "to craft known recipes"
+      result:
+        title: "Discovery Result"
+        lore: "Discovered recipes will appear here"
+    craft:
+      title: "Craft Item"
+      lore1: "Select a recipe and place ingredients"
+      lore2: "to craft items"
+    result:
+      title: "Craft Result"
+      lore: "Select a recipe to see the result"
+    nav:
+      previous: "Previous Page"
+      next: "Next Page"
+
+# Rarities
+rarity:
+  trash:
+    name: "Trash"
+  common:
+    name: "Common"
+  uncommon:
+    name: "Uncommon"
+  rare:
+    name: "Rare"
+  epic:
+    name: "Epic"
+  legendary:
+    name: "Legendary"
+  mythic:
+    name: "Mythical"
+
+# Upgrade results
+upgrade:
+  result:
+    success: "Upgrade successful!"
+  too_many_upgrades: "This item already has the maximum number of upgrades."
+  incompatible_upgrade: "This upgrade is incompatible with the current item."
+  too_bad_rarity: "The item's rarity is too low for this upgrade."
+  missing_required_upgrade: "This upgrade requires another upgrade that is not present."
+  invalid_item: "The item is not valid for this upgrade."
+  too_low_level: "The item's level is too low for this upgrade."
+  no_empty_socket: "There are no empty sockets available for this upgrade."
+  socket_color_mismatch: "The socket color does not match the upgrade's color."
+  invalid_upgrade: "The upgrade is not valid for this item."
+  color: "Color: "
+  grants: "Grants: "
+  empty: "<empty>"
+
+# Attributes
+attribute:
+  advantage_physical:
+    name: "Physical Damage"
+  advantage_magical:
+    name: "Magical Damage"
+  advantage_fire:
+    name: "Fire Damage"
+  advantage_water:
+    name: "Water Damage"
+  advantage_earth:
+    name: "Earth Damage"
+  advantage_air:
+    name: "Air Damage"
+  resistance_physical:
+    name: "Physical Resistance"
+  resistance_magical:
+    name: "Magical Resistance"
+  resistance_fire:
+    name: "Fire Resistance"
+  resistance_water:
+    name: "Water Resistance"
+  resistance_earth:
+    name: "Earth Resistance"
+  resistance_air:
+    name: "Air Resistance"
+  penetration_physical:
+    name: "Physical Penetration"
+  penetration_magical:
+    name: "Magical Penetration"
+  penetration_fire:
+    name: "Fire Penetration"
+  penetration_water:
+    name: "Water Penetration"
+  penetration_earth:
+    name: "Earth Penetration"
+  penetration_air:
+    name: "Air Penetration"
+  stat_crit_damage:
+    name: "Critical Damage"
+  stat_crit_chance:
+    name: "Critical Chance"
+  attack_speed:
+    name: "Attack Speed"
+  stat_healingpower:
+    name: "Healing Power"
+  stat_energy_regen:
+    name: "Energy Regeneration"
+  stat_health_regen:
+    name: "Health Regeneration"
+  stat_cdr:
+    name: "Cooldown Reduction"
+  stat_tenacity:
+    name: "Tenacity"
+  max_health:
+    name: "Maximum Health"
+  movement_speed:
+    name: "Movement Speed"
+  safe_fall_distance:
+    name: "Safe Fall Distance"
