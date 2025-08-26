@@ -3,3 +3,9 @@ version: 1.0
 main: de.erethon.hephaestus.Hephaestus
 api-version: '1.21'
 bootstrapper: de.erethon.hephaestus.HephaestusBootstrap
+dependencies:
+  server:
+    Hecate:
+      load: BEFORE
+      required: true
+      join-classpath: true
