@@ -29,7 +29,6 @@ public class TranslationManager {
     public void initialize() {
         loadTranslations();
 
-        // Register our translation registry as a source
         if (!translationSourceAdded) {
             GlobalTranslator.translator().addSource(translationRegistry);
             translationSourceAdded = true;
@@ -38,10 +37,7 @@ public class TranslationManager {
     }
 
     private void loadTranslations() {
-        // Load English translations
         loadTranslationFile("translations_en.yml", Locale.US);
-
-        // Load German translations
         loadTranslationFile("translations_de.yml", Locale.GERMANY);
 
         plugin.getLogger().info("Loaded translations for supported locales");
@@ -52,16 +48,12 @@ public class TranslationManager {
         File translationFile = new File(dataFolder, fileName);
 
         YamlConfiguration config;
-
-        // If file doesn't exist in data folder, copy from resources and load it
         if (!translationFile.exists()) {
             plugin.saveResource(fileName, false);
         }
 
-        // Load the file
         config = YamlConfiguration.loadConfiguration(translationFile);
 
-        // Also load defaults from resources as fallback
         InputStream defaultStream = plugin.getResource(fileName);
         if (defaultStream != null) {
             YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(
@@ -70,7 +62,6 @@ public class TranslationManager {
             config.setDefaults(defaultConfig);
         }
 
-        // Register all translations
         registerTranslationsFromConfig(config, "", locale);
 
         plugin.getLogger().info("Loaded " + fileName + " for locale " + locale.toString());
@@ -82,7 +73,6 @@ public class TranslationManager {
         for (String key : keys) {
             Object value = config.get(key);
 
-            // Only process leaf nodes (actual values, not sections)
             if (value instanceof String) {
                 String fullKey = prefix.isEmpty() ? key : prefix + "." + key;
                 String translationKey = "hephaestus." + fullKey;

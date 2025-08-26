@@ -1,10 +1,21 @@
 package de.erethon.hephaestus;
 
+import de.erethon.bedrock.database.BedrockDBConnection;
+import de.erethon.hecate.Hecate;
 import de.erethon.hephaestus.blocks.HBlockLibrary;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemLibrary;
 import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.items.sets.HEquipmentManager;
+import de.erethon.hephaestus.jobs.JobDatabaseManager;
+import de.erethon.hephaestus.jobs.JobManager;
+import de.erethon.hephaestus.jobs.commands.JobCommand;
+import de.erethon.hephaestus.jobs.crafting.RecipeManager;
+import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
+import de.erethon.hephaestus.jobs.crafting.commands.CraftingCommand;
+import de.erethon.hephaestus.listeners.EquipmentListener;
 import de.erethon.hephaestus.listeners.HListener;
+import de.erethon.hephaestus.translations.TranslationManager;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.translation.GlobalTranslator;
 import net.kyori.adventure.translation.TranslationRegistry;
@@ -16,8 +27,10 @@ import net.minecraft.world.item.Items;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.text.MessageFormat;
 import java.util.Locale;
 
@@ -27,9 +40,12 @@ public final class Hephaestus extends JavaPlugin {
 
     private final HItemLibrary itemLibrary;
     private final HBlockLibrary blockLibrary = new HBlockLibrary();
-    GlobalTranslator globalTranslator = GlobalTranslator.translator();
-    TranslationRegistry translationRegistry = TranslationRegistry.create(Key.key("hephaestus"));
-    private boolean translationSourceAdded = false; // ensure we only add once
+    private HEquipmentManager equipmentManager;
+    private JobManager jobManager;
+    private JobDatabaseManager jobDatabaseManager;
+    private RecipeManager recipeManager;
+    private PlayerCraftingProgress playerCraftingProgress;
+    private TranslationManager translationManager;
 
     public Hephaestus(HItemLibrary itemLibrary) {
         super();
@@ -64,26 +80,74 @@ public final class Hephaestus extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // Initialize translation system first
+        translationManager = new TranslationManager(this);
+        translationManager.initialize();
+
+        // Initialize database and job system
+        initializeJobSystem();
+
         HListener itemListener = new HListener(this);
+        EquipmentListener equipmentListener = new EquipmentListener();
         Bukkit.getPluginManager().registerEvents(itemListener, this);
         Bukkit.getPluginManager().registerEvents(blockLibrary, this);
+        Bukkit.getPluginManager().registerEvents(equipmentListener, this);
         itemLibrary.load();
         if (itemLibrary.get(BuiltInRegistries.ITEM.getKey(Items.DIAMOND)) == null) {
             getLogger().warning("No vanilla items found. Generating default items...");
             generateDefaultItems();
         }
-        registerCommonTranslations();
-        // Register our translation registry as a source (after initial registrations)
-        if (!translationSourceAdded) {
-            GlobalTranslator.translator().addSource(translationRegistry);
-            translationSourceAdded = true;
-            getLogger().info("Hephaestus translation source registered.");
-        }
+
+        // let's hope Spellbook is ready here. We have to test this.
+        File equipmentFile = new File(getDataFolder(), "equipment.yml");
+        equipmentManager = new HEquipmentManager(equipmentFile);
+        JobCommand jobCommand = new JobCommand("job");
+        Bukkit.getCommandMap().register("jobsxl", jobCommand);
+
+        // Register crafting command
+        CraftingCommand craftingCommand = new CraftingCommand("craft");
+        Bukkit.getCommandMap().register("jcrafting", craftingCommand);
     }
 
     @Override
     public void onDisable() {
         itemLibrary.save();
+        if (jobDatabaseManager != null) {
+            jobDatabaseManager.close();
+        }
+    }
+
+    private void initializeJobSystem() {
+        try {
+
+            YamlConfiguration env = YamlConfiguration.loadConfiguration(new File(Bukkit.getWorldContainer(), "environment.yml"));
+            try {
+                BedrockDBConnection connection = new BedrockDBConnection(env.getString("dbUrl"),
+                        env.getString("dbUser"),
+                        env.getString("dbPassword"),
+                        "org.postgresql.ds.PGSimpleDataSource");
+                jobDatabaseManager = new JobDatabaseManager(connection);
+            }
+            catch (Exception e) {
+                Hecate.log("Failed to connect to database. Hecate will not work.");
+                e.printStackTrace();
+                return;
+            }
+
+            File jobsFile = new File(getDataFolder(), "jobs.yml");
+            jobManager = new JobManager(jobDatabaseManager, jobsFile);
+
+            // Initialize crafting system
+            File recipesFile = new File(getDataFolder(), "recipes.yml");
+            recipeManager = new RecipeManager(recipesFile);
+            playerCraftingProgress = new PlayerCraftingProgress(jobDatabaseManager);
+
+            getLogger().info("Job system initialized successfully");
+            getLogger().info("Crafting system initialized successfully");
+        } catch (Exception e) {
+            getLogger().severe("Failed to initialize job system: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public HItemLibrary getLibrary() {
@@ -98,7 +162,7 @@ public final class Hephaestus extends JavaPlugin {
         if (translation == null) {
             return;
         }
-        translationRegistry.register(key, locale, new MessageFormat(translation));
+        translationManager.registerTranslation(key, locale, translation);
     }
 
     private void generateDefaultItems() {
@@ -113,142 +177,23 @@ public final class Hephaestus extends JavaPlugin {
         itemLibrary.save();
     }
 
-    private void registerCommonTranslations() {
-        // Rarities
-        // EN
-        registerTranslation("hephaestus.rarity.trash.name", Locale.US, "Trash");
-        registerTranslation("hephaestus.rarity.common.name", Locale.US, "Common");
-        registerTranslation("hephaestus.rarity.uncommon.name", Locale.US, "Uncommon");
-        registerTranslation("hephaestus.rarity.rare.name", Locale.US, "Rare");
-        registerTranslation("hephaestus.rarity.epic.name", Locale.US, "Epic");
-        registerTranslation("hephaestus.rarity.legendary.name", Locale.US, "Legendary");
-        registerTranslation("hephaestus.rarity.mythic.name", Locale.US, "Mythical");
-        // DE
-        registerTranslation("hephaestus.rarity.trash.name", Locale.GERMANY, "Müll");
-        registerTranslation("hephaestus.rarity.common.name", Locale.GERMANY, "Gewöhnlich");
-        registerTranslation("hephaestus.rarity.uncommon.name", Locale.GERMANY, "Ungewöhnlich");
-        registerTranslation("hephaestus.rarity.rare.name", Locale.GERMANY, "Selten");
-        registerTranslation("hephaestus.rarity.epic.name", Locale.GERMANY, "Episch");
-        registerTranslation("hephaestus.rarity.legendary.name", Locale.GERMANY, "Legendär");
-        registerTranslation("hephaestus.rarity.mythic.name", Locale.GERMANY, "Mythisch");
+    public JobManager getJobManager() {
+        return jobManager;
+    }
 
-        // HUpgradeResults
-        registerTranslation("hephaestus.upgrade.result.success", Locale.US, "Upgrade successful!");
-        registerTranslation("hephaestus.upgrade.result.success", Locale.GERMANY, "Upgrade erfolgreich!");
-        registerTranslation("hephaestus.upgrade.too_many_upgrades", Locale.US, "This item already has the maximum number of upgrades.");
-        registerTranslation("hephaestus.upgrade.too_many_upgrades", Locale.GERMANY, "Dieses Item hat bereits die maximale Anzahl an Upgrades.");
-        registerTranslation("hephaestus.upgrade.incompatible_upgrade", Locale.US, "This upgrade is incompatible with the current item.");
-        registerTranslation("hephaestus.upgrade.incompatible_upgrade", Locale.GERMANY, "Dieses Upgrade ist inkompatibel mit dem aktuellen Item.");
-        registerTranslation("hephaestus.upgrade.too_bad_rarity", Locale.US, "The item's rarity is too low for this upgrade.");
-        registerTranslation("hephaestus.upgrade.too_bad_rarity", Locale.GERMANY, "Die Seltenheit des Items ist zu niedrig für dieses Upgrade.");
-        registerTranslation("hephaestus.upgrade.missing_required_upgrade", Locale.US, "This upgrade requires another upgrade that is not present.");
-        registerTranslation("hephaestus.upgrade.missing_required_upgrade", Locale.GERMANY, "Dieses Upgrade benötigt ein anderes Upgrade, das nicht vorhanden ist.");
-        registerTranslation("hephaestus.upgrade.invalid_item", Locale.US, "The item is not valid for this upgrade.");
-        registerTranslation("hephaestus.upgrade.invalid_item", Locale.GERMANY, "Das Item ist für dieses Upgrade nicht gültig.");
-        registerTranslation("hephaestus.upgrade.too_low_level", Locale.US, "The item's level is too low for this upgrade.");
-        registerTranslation("hephaestus.upgrade.too_low_level", Locale.GERMANY, "Das Item-Level ist zu niedrig für dieses Upgrade.");
-        registerTranslation("hephaestus.upgrade.no_empty_socket", Locale.US, "There are no empty sockets available for this upgrade.");
-        registerTranslation("hephaestus.upgrade.no_empty_socket", Locale.GERMANY, "Es sind keine leeren Sockel für dieses Upgrade verfügbar.");
-        registerTranslation("hephaestus.upgrade.socket_color_mismatch", Locale.US, "The socket color does not match the upgrade's color.");
-        registerTranslation("hephaestus.upgrade.socket_color_mismatch", Locale.GERMANY, "Die Sockelfarbe stimmt nicht mit der Farbe des Upgrades überein.");
-        registerTranslation("hephaestus.upgrade.invalid_upgrade", Locale.US, "The upgrade is not valid for this item.");
-        registerTranslation("hephaestus.upgrade.invalid_upgrade", Locale.GERMANY, "Das Upgrade ist für dieses Item nicht gültig.");
+    public JobDatabaseManager getJobDatabaseManager() {
+        return jobDatabaseManager;
+    }
 
-        // Upgrade lore
-        registerTranslation("hephaestus.upgrade.color", Locale.US, "Color: ");
-        registerTranslation("hephaestus.upgrade.color", Locale.GERMANY, "Farbe: ");
-        registerTranslation("hephaestus.upgrade.grants", Locale.US, "Grants: ");
-        registerTranslation("hephaestus.upgrade.grants", Locale.GERMANY, "Gewährt: ");
-        registerTranslation("hephaestus.upgrade.empty", Locale.US, "<empty>");
-        registerTranslation("hephaestus.upgrade.empty", Locale.GERMANY, "<leer>");
+    public RecipeManager getRecipeManager() {
+        return recipeManager;
+    }
 
-        // Attributes - Let's only do the common ones for now
-        // advantage_physical
-        registerTranslation("hephaestus.attribute.advantage_physical.name", Locale.US, "Physical Damage");
-        registerTranslation("hephaestus.attribute.advantage_physical.name", Locale.GERMANY, "Physischer Schaden");
-        // advantage_magical
-        registerTranslation("hephaestus.attribute.advantage_magical.name", Locale.US, "Magical Damage");
-        registerTranslation("hephaestus.attribute.advantage_magical.name", Locale.GERMANY, "Magischer Schaden");
-        // advantage_fire
-        registerTranslation("hephaestus.attribute.advantage_fire.name", Locale.US, "Fire Damage");
-        registerTranslation("hephaestus.attribute.advantage_fire.name", Locale.GERMANY, "Feuerschaden");
-        // advantage_water
-        registerTranslation("hephaestus.attribute.advantage_water.name", Locale.US, "Water Damage");
-        registerTranslation("hephaestus.attribute.advantage_water.name", Locale.GERMANY, "Wasserschaden");
-        // advantage_earth
-        registerTranslation("hephaestus.attribute.advantage_earth.name", Locale.US, "Earth Damage");
-        registerTranslation("hephaestus.attribute.advantage_earth.name", Locale.GERMANY, "Erdschaden");
-        // advantage_air
-        registerTranslation("hephaestus.attribute.advantage_air.name", Locale.US, "Air Damage");
-        registerTranslation("hephaestus.attribute.advantage_air.name", Locale.GERMANY, "Luftschaden");
-        // resistance_physical
-        registerTranslation("hephaestus.attribute.resistance_physical.name", Locale.US, "Physical Resistance");
-        registerTranslation("hephaestus.attribute.resistance_physical.name", Locale.GERMANY, "Physische Resistenz");
-        // resistance_magical
-        registerTranslation("hephaestus.attribute.resistance_magical.name", Locale.US, "Magical Resistance");
-        registerTranslation("hephaestus.attribute.resistance_magical.name", Locale.GERMANY, "Magische Resistenz");
-        // resistance_fire
-        registerTranslation("hephaestus.attribute.resistance_fire.name", Locale.US, "Fire Resistance");
-        registerTranslation("hephaestus.attribute.resistance_fire.name", Locale.GERMANY, "Feuerresistenz");
-        // resistance_water
-        registerTranslation("hephaestus.attribute.resistance_water.name", Locale.US, "Water Resistance");
-        registerTranslation("hephaestus.attribute.resistance_water.name", Locale.GERMANY, "Wasserresistenz");
-        // resistance_earth
-        registerTranslation("hephaestus.attribute.resistance_earth.name", Locale.US, "Earth Resistance");
-        registerTranslation("hephaestus.attribute.resistance_earth.name", Locale.GERMANY, "Erdresistenz");
-        // resistance_air
-        registerTranslation("hephaestus.attribute.resistance_air.name", Locale.US, "Air Resistance");
-        registerTranslation("hephaestus.attribute.resistance_air.name", Locale.GERMANY, "Luftresistenz");
-        // penetration_physical
-        registerTranslation("hephaestus.attribute.penetration_physical.name", Locale.US, "Physical Penetration");
-        registerTranslation("hephaestus.attribute.penetration_physical.name", Locale.GERMANY, "Physische Durchdringung");
-        // penetration_magical
-        registerTranslation("hephaestus.attribute.penetration_magical.name", Locale.US, "Magical Penetration");
-        registerTranslation("hephaestus.attribute.penetration_magical.name", Locale.GERMANY, "Magische Durchdringung");
-        // penetration_fire
-        registerTranslation("hephaestus.attribute.penetration_fire.name", Locale.US, "Fire Penetration");
-        registerTranslation("hephaestus.attribute.penetration_fire.name", Locale.GERMANY, "Feuerdurchdringung");
-        // penetration_water
-        registerTranslation("hephaestus.attribute.penetration_water.name", Locale.US, "Water Penetration");
-        registerTranslation("hephaestus.attribute.penetration_water.name", Locale.GERMANY, "Wasserdurchdringung");
-        // penetration_earth
-        registerTranslation("hephaestus.attribute.penetration_earth.name", Locale.US, "Earth Penetration");
-        registerTranslation("hephaestus.attribute.penetration_earth.name", Locale.GERMANY, "Erddurchdringung");
-        // penetration_air
-        registerTranslation("hephaestus.attribute.penetration_air.name", Locale.US, "Air Penetration");
-        registerTranslation("hephaestus.attribute.penetration_air.name", Locale.GERMANY, "Luftdurchdringung");
-        // stat_crit_damage
-        registerTranslation("hephaestus.attribute.stat_crit_damage.name", Locale.US, "Critical Damage");
-        registerTranslation("hephaestus.attribute.stat_crit_damage.name", Locale.GERMANY, "Kritischer Schaden");
-        // stat_crit_chance
-        registerTranslation("hephaestus.attribute.stat_crit_chance.name", Locale.US, "Critical Chance");
-        registerTranslation("hephaestus.attribute.stat_crit_chance.name", Locale.GERMANY, "Kritische Chance");
-        // attack_speed
-        registerTranslation("hephaestus.attribute.attack_speed.name", Locale.US, "Attack Speed");
-        registerTranslation("hephaestus.attribute.attack_speed.name", Locale.GERMANY, "Angriffsgeschwindigkeit");
-        // stat_healingpower
-        registerTranslation("hephaestus.attribute.stat_healingpower.name", Locale.US, "Healing Power");
-        registerTranslation("hephaestus.attribute.stat_healingpower.name", Locale.GERMANY, "Heilungskraft");
-        // stat_energy_regen
-        registerTranslation("hephaestus.attribute.stat_energy_regen.name", Locale.US, "Energy Regeneration");
-        registerTranslation("hephaestus.attribute.stat_energy_regen.name", Locale.GERMANY, "Energie-Regeneration");
-        // stat_health_regen
-        registerTranslation("hephaestus.attribute.stat_health_regen.name", Locale.US, "Health Regeneration");
-        registerTranslation("hephaestus.attribute.stat_health_regen.name", Locale.GERMANY, "Lebens-Regeneration");
-        // stat_cdr
-        registerTranslation("hephaestus.attribute.stat_cdr.name", Locale.US, "Cooldown Reduction");
-        registerTranslation("hephaestus.attribute.stat_cdr.name", Locale.GERMANY, "Abklingzeitverringerung");
-        // stat_tenacity
-        registerTranslation("hephaestus.attribute.stat_tenacity.name", Locale.US, "Tenacity");
-        registerTranslation("hephaestus.attribute.stat_tenacity.name", Locale.GERMANY, "Zähigkeit");
-        // max_health
-        registerTranslation("hephaestus.attribute.max_health.name", Locale.US, "Maximum Health");
-        registerTranslation("hephaestus.attribute.max_health.name", Locale.GERMANY, "Maximales Leben");
-        // movement_speed
-        registerTranslation("hephaestus.attribute.movement_speed.name", Locale.US, "Movement Speed");
-        registerTranslation("hephaestus.attribute.movement_speed.name", Locale.GERMANY, "Bewegungsgeschwindigkeit");
-        // safe_fall_distance
-        registerTranslation("hephaestus.attribute.safe_fall_distance.name", Locale.US, "Safe Fall Distance");
-        registerTranslation("hephaestus.attribute.safe_fall_distance.name", Locale.GERMANY, "Sichere Fallhöhe");
+    public PlayerCraftingProgress getPlayerCraftingProgress() {
+        return playerCraftingProgress;
+    }
+
+    public TranslationManager getTranslationManager() {
+        return translationManager;
     }
 }
