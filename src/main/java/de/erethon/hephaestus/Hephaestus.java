@@ -3,6 +3,7 @@ package de.erethon.hephaestus;
 import de.erethon.bedrock.database.BedrockDBConnection;
 import de.erethon.hecate.Hecate;
 import de.erethon.hephaestus.blocks.HBlockLibrary;
+import de.erethon.hephaestus.crafting.VanillaRecipeManager;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemLibrary;
 import de.erethon.hephaestus.items.HItemStack;
@@ -13,6 +14,7 @@ import de.erethon.hephaestus.jobs.commands.JobCommand;
 import de.erethon.hephaestus.jobs.crafting.RecipeManager;
 import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
 import de.erethon.hephaestus.jobs.crafting.commands.CraftingCommand;
+import de.erethon.hephaestus.listeners.CraftingListener;
 import de.erethon.hephaestus.listeners.EquipmentListener;
 import de.erethon.hephaestus.listeners.HListener;
 import de.erethon.hephaestus.translations.TranslationManager;
@@ -46,6 +48,7 @@ public final class Hephaestus extends JavaPlugin {
     private RecipeManager recipeManager;
     private PlayerCraftingProgress playerCraftingProgress;
     private TranslationManager translationManager;
+    private VanillaRecipeManager vanillaRecipeManager;
 
     public Hephaestus(HItemLibrary itemLibrary) {
         super();
@@ -97,6 +100,11 @@ public final class Hephaestus extends JavaPlugin {
             getLogger().warning("No vanilla items found. Generating default items...");
             generateDefaultItems();
         }
+
+        // Initialize vanilla crafting system
+        File vanillaRecipesFile = new File(getDataFolder(), "vanilla_recipes.yml");
+        vanillaRecipeManager = new VanillaRecipeManager(this, vanillaRecipesFile);
+        Bukkit.getPluginManager().registerEvents(new CraftingListener(this, vanillaRecipeManager), this);
 
         // let's hope Spellbook is ready here. We have to test this.
         File equipmentFile = new File(getDataFolder(), "equipment.yml");
@@ -195,5 +203,9 @@ public final class Hephaestus extends JavaPlugin {
 
     public TranslationManager getTranslationManager() {
         return translationManager;
+    }
+
+    public VanillaRecipeManager getVanillaRecipeManager() {
+        return vanillaRecipeManager;
     }
 }

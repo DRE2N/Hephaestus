@@ -2,6 +2,7 @@ package de.erethon.hephaestus.translations;
 
 import de.erethon.hephaestus.Hephaestus;
 import net.kyori.adventure.key.Key;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.translation.GlobalTranslator;
 import net.kyori.adventure.translation.TranslationRegistry;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -91,5 +92,9 @@ public class TranslationManager {
 
     public TranslationRegistry getTranslationRegistry() {
         return translationRegistry;
+    }
+
+    public static MessageFormat translate(String key, Locale locale) {
+        return GlobalTranslator.translator().translate(key, locale);
     }
 }

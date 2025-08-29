@@ -1,0 +1,71 @@
+recipes:
+  # Example shaped recipe with fixed level
+  custom_sword:
+    type: shaped
+    result:
+      item: "hephaestus:custom_sword"
+      amount: 1
+      level: 5  # Fixed level 5
+    pattern:
+      - " I "
+      - " I "
+      - " S "
+    ingredients:
+      I: "minecraft:iron_ingot"
+      S: "minecraft:stick"
+
+  # Example shapeless recipe with level range
+  custom_tool:
+    type: shapeless
+    result:
+      item: "hephaestus:custom_tool"
+      amount: 1
+      level: "3-7"  # Random level between 3 and 7
+    ingredients:
+      - "minecraft:diamond"
+      - "minecraft:stick"
+      - "hephaestus:custom_gem"
+
+  # Mixed recipe using both vanilla and custom items with level object format
+  enhanced_pickaxe:
+    type: shaped
+    result:
+      item: "hephaestus:enhanced_pickaxe"
+      amount: 1
+      level:
+        min: 10
+        max: 15  # Random level between 10 and 15
+    pattern:
+      - "GGG"
+      - " S "
+      - " S "
+    ingredients:
+      G: "hephaestus:mystic_gem"
+      S: "minecraft:stick"
+
+  # Simple upgrade recipe with no level (defaults to 0)
+  gem_upgrade:
+    type: shapeless
+    result:
+      item: "hephaestus:upgraded_gem"
+      amount: 1
+      # No level specified - defaults to 0
+    ingredients:
+      - "hephaestus:basic_gem"
+      - "minecraft:redstone"
+      - "minecraft:glowstone_dust"
+
+  # High-level equipment with specific level
+  legendary_armor:
+    type: shaped
+    result:
+      item: "hephaestus:legendary_chestplate"
+      amount: 1
+      level: 25  # High level equipment
+    pattern:
+      - "DDD"
+      - "DCD"
+      - "DDD"
+    ingredients:
+      D: "minecraft:diamond"
+      C: "hephaestus:dragon_core"

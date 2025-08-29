@@ -482,7 +482,9 @@ public class HItem {
         }
 
         levelWeights = HRandom.loadWeights(config, "random.level");
-        plugin.getLogger().info("Loaded " + levelWeights.size() + " level weights for item " + key);
+        if (!levelWeights.isEmpty()) {
+            plugin.getLogger().info("Loaded " + levelWeights.size() + " level weights for item " + key);
+        }
         // Load level-specific rarity and slot weights
         if (config.contains("random.rarity")) {
             var levelSpecificRaritySection = config.getConfigurationSection("random.rarity");
