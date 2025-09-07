@@ -37,6 +37,21 @@ public class PlayerCraftingProgress {
     }
 
     /**
+     * Records multiple crafting attempts and increments the count by the specified amount
+     */
+    public CompletableFuture<Integer> recordCraftMultiple(UUID characterId, String recipeId, int quantity) {
+        return databaseManager.queryAsync(handle -> {
+            CraftingProgressDao dao = handle.attach(CraftingProgressDao.class);
+            // Record each craft individually to maintain proper count
+            for (int i = 0; i < quantity; i++) {
+                dao.recordCraft(characterId, recipeId);
+            }
+            // Get the updated count
+            return dao.getCraftCount(characterId, recipeId).orElse(quantity);
+        });
+    }
+
+    /**
      * Gets all discovered recipes for a character
      */
     public CompletableFuture<Set<String>> getDiscoveredRecipes(UUID characterId) {

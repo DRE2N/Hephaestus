@@ -1,7 +1,6 @@
 package de.erethon.hephaestus.items.sets;
 
 import de.erethon.hecate.Hecate;
-import de.erethon.hecate.items.EquipmentSet;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -12,7 +11,7 @@ public class HEquipmentManager {
 
     private YamlConfiguration cfg;
 
-    private final HashMap<String, de.erethon.hecate.items.EquipmentSet> equipmentSets = new HashMap<>();
+    private final HashMap<String, EquipmentSet> equipmentSets = new HashMap<>();
 
     public HEquipmentManager(File file) {
         if (!file.exists()) {
@@ -23,10 +22,11 @@ public class HEquipmentManager {
         load();
     }
 
-    public void addEquipmentSet(String tag, de.erethon.hecate.items.EquipmentSet equipmentSet) {
+    public void addEquipmentSet(String tag, EquipmentSet equipmentSet) {
         equipmentSets.put(tag, equipmentSet);
     }
-    public de.erethon.hecate.items.EquipmentSet getEquipmentSet(String tag) {
+
+    public EquipmentSet getEquipmentSet(String tag) {
         return equipmentSets.get(tag);
     }
 
@@ -38,7 +38,11 @@ public class HEquipmentManager {
         }
         for (String key : section.getKeys(false)) {
             if (cfg.isConfigurationSection(key)) {
-                de.erethon.hecate.items.EquipmentSet equipmentSet = EquipmentSet.fromConfig(key, cfg.getConfigurationSection(key));
+                if (cfg.getConfigurationSection(key) == null) {
+                    System.err.println("Equipment set configuration section is null: " + key);
+                    continue;
+                }
+                EquipmentSet equipmentSet = EquipmentSet.fromConfig(key, cfg.getConfigurationSection(key));
                 equipmentSets.put(key, equipmentSet);
             } else {
                 System.err.println("Invalid equipment set configuration: " + key);

@@ -179,6 +179,26 @@ public class RecipeManager {
         return null;
     }
 
+    /**
+     * Discover a recipe using multiple ingredients (new method for improved discovery)
+     * @param jobId the job ID to search recipes for
+     * @param ingredients list of item stacks provided for discovery
+     * @return discovered recipe or null if none found
+     */
+    public JobRecipe discoverRecipeWithIngredients(String jobId, List<ItemStack> ingredients) {
+        Set<String> jobRecipeIds = recipesByJob.get(jobId);
+        if (jobRecipeIds == null) return null;
+
+        // First try to find recipes that match ingredients for discovery
+        for (String recipeId : jobRecipeIds) {
+            JobRecipe recipe = recipes.get(recipeId);
+            if (recipe != null && recipe.isDiscoverable() && recipe.matchesIngredientsForDiscovery(ingredients)) {
+                return recipe;
+            }
+        }
+        return null;
+    }
+
     public void reloadRecipes() {
         loadRecipes();
     }

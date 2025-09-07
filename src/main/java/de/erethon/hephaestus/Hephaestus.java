@@ -18,9 +18,6 @@ import de.erethon.hephaestus.listeners.CraftingListener;
 import de.erethon.hephaestus.listeners.EquipmentListener;
 import de.erethon.hephaestus.listeners.HListener;
 import de.erethon.hephaestus.translations.TranslationManager;
-import net.kyori.adventure.key.Key;
-import net.kyori.adventure.translation.GlobalTranslator;
-import net.kyori.adventure.translation.TranslationRegistry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -33,7 +30,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
-import java.text.MessageFormat;
 import java.util.Locale;
 
 public final class Hephaestus extends JavaPlugin {
@@ -164,6 +160,10 @@ public final class Hephaestus extends JavaPlugin {
 
     public HBlockLibrary getBlockLibrary() {
         return blockLibrary;
+    }
+
+    public HEquipmentManager getEquipmentManager() {
+        return equipmentManager;
     }
 
     public void registerTranslation(String key, Locale locale, String translation) {

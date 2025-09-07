@@ -6,10 +6,10 @@ import de.erethon.hecate.classes.HClass;
 import de.erethon.hecate.data.HCharacter;
 import de.erethon.hecate.data.HPlayer;
 import de.erethon.hecate.events.CombatModeReason;
-import de.erethon.hecate.items.EquipmentSet;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.items.sets.EquipmentSet;
 import de.erethon.spellbook.api.TraitData;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import org.bukkit.Material;
@@ -33,7 +33,8 @@ import java.util.Set;
 
 public class EquipmentListener implements Listener {
 
-    private Hecate plugin = Hecate.getInstance();
+    private final Hecate hecate = Hecate.getInstance();
+    private final Hephaestus plugin = Hephaestus.INSTANCE;
 
     @EventHandler
     private void onEquip(InventoryClickEvent event) {
@@ -211,14 +212,14 @@ public class EquipmentListener implements Listener {
     }
 
     private HCharacter getCharacterFromPlayer(Player player) {
-        HPlayer hPlayer = plugin.getDatabaseManager().getHPlayer(player);
+        HPlayer hPlayer = hecate.getDatabaseManager().getHPlayer(player);
         return hPlayer.getSelectedCharacter();
     }
 
     @EventHandler
     public void onModeSwitch(PlayerSwapHandItemsEvent event) {
         // The OffHandItem is the item that WOULD BE in the offhand if the event is not cancelled. Thanks Spigot for great method naming!
-        HCharacter hCharacter = plugin.getDatabaseManager().getCurrentCharacter(event.getPlayer());
+        HCharacter hCharacter = hecate.getDatabaseManager().getCurrentCharacter(event.getPlayer());
         if (hCharacter == null) {
             return;
         }

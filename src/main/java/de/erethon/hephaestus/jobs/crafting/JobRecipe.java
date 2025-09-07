@@ -90,9 +90,32 @@ public class JobRecipe {
     }
 
     /**
-     * Check if the provided ingredients match this recipe
+     * Check if the provided ingredients match this recipe for discovery purposes
+     * Discovery only requires one of the recipe ingredients to be present
      * @param providedIngredients list of item stacks to check
-     * @return true if ingredients match the recipe requirements
+     * @return true if at least one ingredient matches for discovery
+     */
+    public boolean matchesIngredientsForDiscovery(List<ItemStack> providedIngredients) {
+        if (ingredients.isEmpty()) return false;
+
+        // For discovery, we only need one ingredient to match
+        for (RecipeIngredient recipeIngredient : ingredients) {
+            for (ItemStack provided : providedIngredients) {
+                if (provided == null || provided.getType().isAir()) continue;
+
+                HItemStack hStack = HItemStack.getFromStack(provided);
+                if (hStack != null && hStack.getItem().getKey().toString().equals(recipeIngredient.getItemId())) {
+                    return true; // Found matching ingredient for discovery
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if the provided ingredients match this recipe exactly for crafting
+     * @param providedIngredients list of item stacks to check
+     * @return true if ingredients match the recipe requirements exactly
      */
     public boolean matchesIngredients(List<ItemStack> providedIngredients) {
         Map<String, Integer> requiredCounts = new HashMap<>();
@@ -112,6 +135,65 @@ public class JobRecipe {
         }
 
         return requiredCounts.equals(providedCounts);
+    }
+
+    /**
+     * Check if the provided ingredients satisfy the minimum requirements for this recipe
+     * @param providedIngredients list of item stacks to check
+     * @param multiplier how many times the recipe should be crafted
+     * @return true if ingredients are sufficient for the given multiplier
+     */
+    public boolean hasEnoughIngredients(List<ItemStack> providedIngredients, int multiplier) {
+        Map<String, Integer> requiredCounts = new HashMap<>();
+        for (RecipeIngredient ingredient : ingredients) {
+            requiredCounts.put(ingredient.getItemId(), ingredient.getAmount() * multiplier);
+        }
+
+        Map<String, Integer> providedCounts = new HashMap<>();
+        for (ItemStack stack : providedIngredients) {
+            if (stack == null || stack.getType().isAir()) continue;
+
+            HItemStack hStack = HItemStack.getFromStack(stack);
+            if (hStack != null) {
+                String itemId = hStack.getItem().getKey().toString();
+                providedCounts.put(itemId, providedCounts.getOrDefault(itemId, 0) + stack.getAmount());
+            }
+        }
+
+        // Check if we have at least the required amount of each ingredient
+        for (Map.Entry<String, Integer> required : requiredCounts.entrySet()) {
+            if (providedCounts.getOrDefault(required.getKey(), 0) < required.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Get the maximum number of times this recipe can be crafted with the provided ingredients
+     * @param providedIngredients list of item stacks to check
+     * @return maximum craft count, 0 if recipe cannot be crafted
+     */
+    public int getMaxCraftableCount(List<ItemStack> providedIngredients) {
+        Map<String, Integer> providedCounts = new HashMap<>();
+        for (ItemStack stack : providedIngredients) {
+            if (stack == null || stack.getType().isAir()) continue;
+
+            HItemStack hStack = HItemStack.getFromStack(stack);
+            if (hStack != null) {
+                String itemId = hStack.getItem().getKey().toString();
+                providedCounts.put(itemId, providedCounts.getOrDefault(itemId, 0) + stack.getAmount());
+            }
+        }
+
+        int maxCraftable = Integer.MAX_VALUE;
+        for (RecipeIngredient ingredient : ingredients) {
+            int available = providedCounts.getOrDefault(ingredient.getItemId(), 0);
+            int possibleCrafts = available / ingredient.getAmount();
+            maxCraftable = Math.min(maxCraftable, possibleCrafts);
+        }
+
+        return maxCraftable == Integer.MAX_VALUE ? 0 : maxCraftable;
     }
 
     public void serialize(ConfigurationSection section) {

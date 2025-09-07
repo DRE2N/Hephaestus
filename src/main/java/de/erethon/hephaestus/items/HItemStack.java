@@ -8,6 +8,7 @@ import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
 import de.erethon.hephaestus.items.upgrades.HRolledUpgrade;
 import de.erethon.hephaestus.utils.HUpgradeResult;
 import io.papermc.paper.adventure.PaperAdventure;
+import io.papermc.paper.datacomponent.DataComponentTypes;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;

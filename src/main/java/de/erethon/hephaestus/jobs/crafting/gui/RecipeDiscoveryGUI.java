@@ -167,7 +167,8 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
             }
 
             String jobId = characterJob.job().getId();
-            JobRecipe discoveredRecipe = recipeManager.discoverRecipe(jobId, ingredients);
+            // Use the new discovery method that supports multiple ingredients
+            JobRecipe discoveredRecipe = recipeManager.discoverRecipeWithIngredients(jobId, ingredients);
 
             if (discoveredRecipe == null) {
                 player.sendMessage(Component.text("No recipe discovered with these ingredients.", NamedTextColor.YELLOW));

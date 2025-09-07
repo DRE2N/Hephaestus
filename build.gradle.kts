@@ -25,7 +25,7 @@ java {
     withJavadocJar()
 }
 
-val papyrusVersion = "1.21.7-R0.1-SNAPSHOT"
+val papyrusVersion = "1.21.8-R0.1-SNAPSHOT"
 
 dependencies {
     paperweight.devBundle("de.erethon.papyrus", papyrusVersion) { isChanging = true}
