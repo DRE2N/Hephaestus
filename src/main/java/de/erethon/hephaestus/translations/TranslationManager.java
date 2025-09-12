@@ -87,6 +87,9 @@ public class TranslationManager {
         if (translation == null) {
             return;
         }
+        if (translationRegistry.contains(key, locale)) {
+            return;
+        }
         translationRegistry.register(key, locale, new MessageFormat(translation));
     }
 
