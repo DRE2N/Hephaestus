@@ -73,7 +73,13 @@ public class HephaestusBootstrap implements PluginBootstrap {
                                         return Command.SINGLE_SUCCESS;
                                     }).requires(s -> s.getSender().hasPermission("hephaestus.setblockdata"))
                                     .suggests((ctx, builder) -> {
-                                        itemLibrary.getKeys().forEach(key -> builder.suggest(key.toString()));
+                                        String input = builder.getRemaining().toLowerCase();
+                                        itemLibrary.getKeys().forEach(key -> {
+                                            String keyString = key.toString();
+                                            if (keyString.toLowerCase().startsWith(input)) {
+                                                builder.suggest(keyString);
+                                            }
+                                        });
                                         return builder.buildFuture();
                                     })
                             )
@@ -99,7 +105,12 @@ public class HephaestusBootstrap implements PluginBootstrap {
                                         return Command.SINGLE_SUCCESS;
                                     }).requires(s -> s.getSender().hasPermission("hephaestus.upgrade"))
                                     .suggests((ctx, builder) -> {
-                                        itemLibrary.getUpgradeKeys().forEach(builder::suggest);
+                                        String input = builder.getRemaining().toLowerCase();
+                                        itemLibrary.getUpgradeKeys().forEach(upgradeKey -> {
+                                            if (upgradeKey.toLowerCase().startsWith(input)) {
+                                                builder.suggest(upgradeKey);
+                                            }
+                                        });
                                         return builder.buildFuture();
                                     })
                             )
@@ -158,7 +169,13 @@ public class HephaestusBootstrap implements PluginBootstrap {
                                         )
                                 )
                                 .suggests((ctx, builder) -> {
-                                    itemLibrary.getKeys().forEach(key -> builder.suggest(key.toString()));
+                                    String input = builder.getRemaining().toLowerCase();
+                                    itemLibrary.getKeys().forEach(key -> {
+                                        String keyString = key.toString();
+                                        if (keyString.toLowerCase().startsWith(input)) {
+                                            builder.suggest(keyString);
+                                        }
+                                    });
                                     return builder.buildFuture();
                                 })
                                 .requires(s -> s.getSender().hasPermission("hephaestus.give")))

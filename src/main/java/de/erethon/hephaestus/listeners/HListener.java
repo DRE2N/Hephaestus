@@ -155,7 +155,7 @@ public class HListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        player.sendMessage(Component.translatable(result.toString()));
+        player.sendMessage(Component.translatable(result.translationKey(), NamedTextColor.RED));
         event.setCancelled(true);
     }
 

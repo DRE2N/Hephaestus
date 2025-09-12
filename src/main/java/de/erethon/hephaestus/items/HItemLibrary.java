@@ -188,9 +188,21 @@ public class HItemLibrary {
             return;
         }
         for (HItem item : items.values()) {
-            File subDirectory = new File(directory, item.getKey().getNamespace());
-            File file = new File(subDirectory, item.getKey().getPath() + ".yml");
-            item.save(file);
+            File targetFile;
+
+            if (item.getOriginalFile() != null) {
+                targetFile = item.getOriginalFile();
+                if (targetFile.getParentFile() != null) {
+                    targetFile.getParentFile().mkdirs();
+                }
+            } else {
+                // For programmatically created items, use the namespace/path structure
+                File subDirectory = new File(directory, item.getKey().getNamespace());
+                subDirectory.mkdirs();
+                targetFile = new File(subDirectory, item.getKey().getPath() + ".yml");
+            }
+
+            item.save(targetFile);
         }
     }
 

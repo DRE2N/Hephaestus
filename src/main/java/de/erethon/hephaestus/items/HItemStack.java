@@ -8,12 +8,12 @@ import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
 import de.erethon.hephaestus.items.upgrades.HRolledUpgrade;
 import de.erethon.hephaestus.utils.HUpgradeResult;
 import io.papermc.paper.adventure.PaperAdventure;
-import io.papermc.paper.datacomponent.DataComponentTypes;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.translation.TranslationRegistry;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -135,7 +135,7 @@ public class HItemStack {
         if (!item.getAllowedUpgrades().contains(id) && !item.getAllowedUpgrades().isEmpty()) {
             return HUpgradeResult.INVALID_ITEM;
         }
-        if (upgrade.getValidItems().stream().noneMatch(i -> i.equals(item.getBukkitKey()))  && !upgrade.getValidItems().isEmpty()) {
+        if (upgrade.getValidItems().stream().noneMatch(i -> i.equals(item.getBukkitKey())) && !upgrade.getValidItems().isEmpty()) {
             return HUpgradeResult.INVALID_ITEM;
         }
         if (upgrade.getMinimumLevel() > itemLevel) {
@@ -231,9 +231,13 @@ public class HItemStack {
         }
     }
 
-    public List<OrbSocket> getSockets() { return new ArrayList<>(sockets); }
+    public List<OrbSocket> getSockets() {
+        return new ArrayList<>(sockets);
+    }
 
-    public boolean hasSockets() { return !sockets.isEmpty(); }
+    public boolean hasSockets() {
+        return !sockets.isEmpty();
+    }
 
     public HUpgradeResult insertOrb(HItemStack orbStack) {
         if (orbStack == null || orbStack.getItem() == null || !orbStack.getItem().isOrbItem()) {
@@ -242,12 +246,9 @@ public class HItemStack {
         if (!hasSockets()) {
             return HUpgradeResult.INVALID_ITEM;
         }
-        // Rarity / level gating: orb may only be inserted into item of >= rarity and >= level
+        // Level gating: orb may only be inserted into item of >= level
         if (orbStack.getItemLevel() > this.itemLevel) {
             return HUpgradeResult.TOO_LOW_LEVEL; // item too low level for orb
-        }
-        if (orbStack.getRarity().ordinal() > this.rarity.ordinal()) {
-            return HUpgradeResult.TOO_BAD_RARITY; // higher rarity orb
         }
         OrbColor orbColor = orbStack.getItem().getOrbColor();
         String upgradeId = orbStack.getItem().getGrantedUpgradeId();
@@ -329,7 +330,8 @@ public class HItemStack {
         if (item.isVanilla()) {
             return;
         }
-        String id =  item.getKey().toString().replace(":", ".");
+        TranslationRegistry translationRegistry = Hephaestus.INSTANCE.getTranslationManager().getTranslationRegistry();
+        String id = item.getKey().toString().replace(":", ".");
         net.minecraft.network.chat.Component nameComponent = net.minecraft.network.chat.Component.translatable("hephaestus.item." + id + ".name");
         if (!playerAddedName.isEmpty()) {
             Component advComponent = miniMessage.deserialize(playerAddedName);
@@ -343,11 +345,15 @@ public class HItemStack {
                     .append(Component.translatable("hephaestus.item." + id + ".category", TextColor.color(124, 124, 124)))
                     .append(verticalLine)
                     .append(Component.translatable(rarity.getTranslationKey(), rarity.getColor()));
-            lore.add(PaperAdventure.asVanilla(header));
+            if (translationRegistry.contains("hephaestus.item." + id + ".category")) {
+                lore.add(PaperAdventure.asVanilla(header));
+            }
         } else {
             Component header = Component.translatable("hephaestus.item." + id + ".category")
                     .color(rarity.getColor());
-            lore.add(PaperAdventure.asVanilla(header));
+            if (translationRegistry.contains("hephaestus.item." + id + ".category")) {
+                lore.add(PaperAdventure.asVanilla(header));
+            }
         }
         Component flavourText = Component.translatable("hephaestus.item." + id + ".flavour")
                 .color(NamedTextColor.GRAY)
@@ -356,8 +362,9 @@ public class HItemStack {
             Component advComponent = miniMessage.deserialize(playerAddedFlavourText);
             flavourText = flavourText.append(Component.space()).append(advComponent);
         }
-        lore.add(PaperAdventure.asVanilla(flavourText));
-
+        if (translationRegistry.contains("hephaestus.item." + id + ".flavour")) {
+            lore.add(PaperAdventure.asVanilla(flavourText));
+        }
         // Orb item preview (color + granted upgrade attribute ranges)
         if (item.isOrbItem()) {
             lore.add(PaperAdventure.asVanilla(Component.empty()));
@@ -479,7 +486,10 @@ public class HItemStack {
         itemLevel = optLevel.get();
         String rarityStr = data.getString("rarity").orElse(null);
         if (rarityStr != null && !rarityStr.isEmpty()) {
-            try { rarity = HRarity.valueOf(rarityStr.toUpperCase(Locale.ROOT)); } catch (Exception ignored) {}
+            try {
+                rarity = HRarity.valueOf(rarityStr.toUpperCase(Locale.ROOT));
+            } catch (Exception ignored) {
+            }
         }
         maxUpgrades = data.getInt("maxUpgrades").get();
         String n = data.getString("playerAddedName").get();
@@ -572,7 +582,8 @@ public class HItemStack {
                     }
                     AttributeModifier modifier = new AttributeModifier(modifierId, val, AttributeModifier.Operation.ADD_VALUE);
                     builder.add(holderOpt.get(), modifier, EquipmentSlotGroup.ANY);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
         stack.set(DataComponents.ATTRIBUTE_MODIFIERS, builder.build());
@@ -608,7 +619,7 @@ public class HItemStack {
     }
 
     private static String getAttributeTranslationKey(String key) {
-        String translation =  "hephaestus.attribute." + key.replace(':', '.').replace('.', '_')
+        String translation = "hephaestus.attribute." + key.replace(':', '.').replace('.', '_')
                 .toLowerCase(Locale.ROOT).replace(" ", "_") +
                 ".name";
         translation = translation.replace("minecraft_", "");

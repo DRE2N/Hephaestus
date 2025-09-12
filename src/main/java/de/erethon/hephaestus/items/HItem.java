@@ -76,6 +76,7 @@ public class HItem {
 
     // Blocks
     private float breakSpeedModifier = 1.0f;
+    private final List<BlockDropEntry> blockDropEntries = new ArrayList<>();
 
     // Randomization
     private Map<Integer, Integer> levelWeights = new HashMap<>();
@@ -167,16 +168,39 @@ public class HItem {
         HItemStack hStack = new HItemStack(this); // visuals now auto-init
         int level = 0;
         if (levelWeights != null && !levelWeights.isEmpty()) {
-            level = (int) HRandom.selectWeightedRandomValue(levelWeights, minLevel);
+            Object levelObj = HRandom.selectWeightedRandomValue(levelWeights, minLevel);
+            level = levelObj instanceof Number ? ((Number) levelObj).intValue() : 0;
             hStack.setItemLevel(level);
         }
-        Map<String, Integer> rarityWeightsForLevel = rarityWeights.getOrDefault(level, new HashMap<>());
-        if (!rarityWeightsForLevel.isEmpty()) {
+        // Find rarity weights for this level or nearest lower level
+        Map<String, Integer> rarityWeightsForLevel = rarityWeights.get(level);
+        if (rarityWeightsForLevel == null && !rarityWeights.isEmpty()) {
+            int best = Integer.MIN_VALUE;
+            for (Integer defined : rarityWeights.keySet()) {
+                if (defined <= level && defined > best) best = defined;
+            }
+            if (best != Integer.MIN_VALUE) {
+                rarityWeightsForLevel = rarityWeights.get(best);
+            }
+        }
+        if (rarityWeightsForLevel != null && !rarityWeightsForLevel.isEmpty()) {
             hStack.setRarity(HRarity.valueOf(HRandom.selectWeightedRandomValue(rarityWeightsForLevel).toUpperCase(Locale.ROOT)));
         }
-        Map<Integer, Integer> slotWeightsForLevel = slotWeights.getOrDefault(level, new HashMap<>());
-        if (!slotWeightsForLevel.isEmpty()) {
-            hStack.setMaxUpgrades(HRandom.selectWeightedRandomValue(slotWeightsForLevel));
+        // Find slot weights for this level or nearest lower level
+        Map<Integer, Integer> slotWeightsForLevel = slotWeights.get(level);
+        if (slotWeightsForLevel == null && !slotWeights.isEmpty()) {
+            int best = Integer.MIN_VALUE;
+            for (Integer defined : slotWeights.keySet()) {
+                if (defined <= level && defined > best) best = defined;
+            }
+            if (best != Integer.MIN_VALUE) {
+                slotWeightsForLevel = slotWeights.get(best);
+            }
+        }
+        if (slotWeightsForLevel != null && !slotWeightsForLevel.isEmpty()) {
+            Object slotsObj = HRandom.selectWeightedRandomValue(slotWeightsForLevel);
+            int slots = slotsObj instanceof Number ? ((Number) slotsObj).intValue() : 0;
+            hStack.setMaxUpgrades(slots);
         }
         applyRandomSocketPattern(hStack, level);
         hStack.updateVisuals();
@@ -247,6 +271,15 @@ public class HItem {
     }
 
     /**
+     * Gets the original file this item was loaded from.
+     * This is used to preserve the folder structure when saving items.
+     * @return the File this item was loaded from, or null if created programmatically
+     */
+    public @Nullable File getOriginalFile() {
+        return file;
+    }
+
+    /**
      * Gets the NMS key of this item, which is a unique identifier in the format namespace:path.
      * @return the ResourceLocation key of this item
      */
@@ -303,11 +336,43 @@ public class HItem {
     }
 
     /**
-     * Tags can be used to categorize items, e.g. for filtering who can equip them.
-     * @return a set of tags associated with this item
+     * Gets the block drops defined for this item when it is used to break blocks.
+     * This is a list of BlockDropEntry objects that define item drops with configurable conditions.
+     * @return a list of BlockDropEntry objects
      */
-    public Set<String> getTags() {
-        return tags;
+    public List<BlockDropEntry> getBlockDropEntries() {
+        return blockDropEntries;
+    }
+
+    /**
+     * Evaluates what items should drop when this block is broken with a specific tool.
+     * This method checks the tool's tags against the required tool tags for each drop entry.
+     *
+     * @param toolTags the tags of the tool used to break the block
+     * @return a list of BlockDropEntry objects that match the tool requirements
+     */
+    public List<BlockDropEntry> getApplicableDrops(Set<String> toolTags) {
+        return blockDropEntries.stream()
+                .filter(entry -> {
+                    if (entry.requiredToolTags().isEmpty()) {
+                        return true;
+                    }
+                    if (toolTags == null || toolTags.isEmpty()) {
+                        return false;
+                    }
+                    return toolTags.stream().anyMatch(entry.requiredToolTags()::contains);
+                })
+                .toList();
+    }
+
+    /**
+     * Convenience method to get applicable drops for a tool item.
+     *
+     * @param toolItem the HItem representing the tool used to break the block
+     * @return a list of BlockDropEntry objects that match the tool requirements
+     */
+    public List<BlockDropEntry> getApplicableDrops(HItem toolItem) {
+        return getApplicableDrops(toolItem.getTags());
     }
 
     /**
@@ -362,6 +427,10 @@ public class HItem {
      */
     public Set<String> getAllowedUpgrades() {
         return allowedUpgrades;
+    }
+
+    public Set<String> getTags() {
+        return tags;
     }
 
     public HItemLibrary getLibrary() {
@@ -455,6 +524,30 @@ public class HItem {
         if (config.contains("placementSound")) {
             placementSound = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.parse(config.getString("placementSound", "minecraft:block.stone.place"))).get().value();
         }
+        if (config.contains("blockDrops")) {
+            ConfigurationSection dropsSection = config.getConfigurationSection("blockDrops");
+            if (dropsSection != null) {
+                for (String dropKey : dropsSection.getKeys(false)) {
+                    ConfigurationSection dropSection = dropsSection.getConfigurationSection(dropKey);
+                    if (dropSection != null) {
+                        // New format with full BlockDropEntry configuration
+                        String itemId = dropSection.getString("itemId", dropKey);
+                        double chance = dropSection.getDouble("chance", 1.0);
+                        int minAmount = dropSection.getInt("minAmount", 1);
+                        int maxAmount = dropSection.getInt("maxAmount", 1);
+                        Set<String> requiredToolTags = new HashSet<>();
+                        if (dropSection.contains("requiredToolTags")) {
+                            requiredToolTags.addAll(dropSection.getStringList("requiredToolTags"));
+                        }
+                        blockDropEntries.add(new BlockDropEntry(itemId, chance, minAmount, maxAmount, requiredToolTags));
+                    } else {
+                        // Simp format - just item ID and chance
+                        double chance = dropsSection.getDouble(dropKey, 1.0);
+                        blockDropEntries.add(new BlockDropEntry(dropKey, chance, 1, 1, Set.of()));
+                    }
+                }
+            }
+        }
         if (config.contains("allowedUpgrades")) {
             List<String> allowedUpgrades = config.getStringList("allowedUpgrades");
             this.allowedUpgrades.addAll(allowedUpgrades);
@@ -535,6 +628,9 @@ public class HItem {
     }
 
     public void save(File file) {
+        if (config == null) {
+            config = new YamlConfiguration();
+        }
         config.set("key", key.toString());
         config.setComments("key", List.of("The key of the item. This is used to identify the item in the game, e.g. in /give",
                 "This should be unique and follow the format namespace:path.",

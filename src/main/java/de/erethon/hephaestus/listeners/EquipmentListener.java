@@ -200,13 +200,40 @@ public class EquipmentListener implements Listener {
         }
         HItem item = hItemStack.getItem();
         Set<String> itemTags = item.getTags();
-        Set<String> classTags = hCharacter.getTraitline().getArmorTags();
-        boolean canUse = itemTags == null || classTags == null || itemTags.isEmpty() || classTags.isEmpty();
-        for (String tag : itemTags) {
-            if (classTags.contains(tag)) {
-                canUse = true;
-                break;
+        Set<String> armorTags = hCharacter.getTraitline().getArmorTags();
+        boolean canUse = itemTags == null || armorTags == null || itemTags.isEmpty() || armorTags.isEmpty();
+        if (itemTags == null || armorTags == null) {
+            player.sendRichMessage("<red>You cannot use this item!");
+            return canUse;
+        }
+        if (itemTags.contains("equipment.armor")) {
+            for (String tag : itemTags) {
+                if (armorTags.contains(tag)) {
+                    canUse = true;
+                    break;
+                }
             }
+        }
+        if (!canUse && itemTags.contains("equipment.weapon")) {
+            Set<String> tags = hCharacter.getTraitline().getWeaponTags();
+            for (String tag : itemTags) {
+                if (tags.contains(tag)) {
+                    canUse = true;
+                    break;
+                }
+            }
+        }
+        if (!canUse && itemTags.contains("equipment.accessory")) {
+            Set<String> tags = hCharacter.getTraitline().getAccessoryTags();
+            for (String tag : itemTags) {
+                if (tags.contains(tag)) {
+                    canUse = true;
+                    break;
+                }
+            }
+        }
+        if (!canUse) {
+            player.sendRichMessage("<red>Your archetype or discipline cannot use this item!");
         }
         return canEquipLevel(player, stack, hCharacter) && canUse;
     }

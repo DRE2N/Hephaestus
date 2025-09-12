@@ -1,9 +1,11 @@
 package de.erethon.hephaestus.blocks;
 
 import de.erethon.hephaestus.Hephaestus;
+import de.erethon.hephaestus.items.BlockDropEntry;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -24,7 +26,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.BoundingBox;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 
 public class HBlockLibrary implements Listener {
 
@@ -92,15 +98,61 @@ public class HBlockLibrary implements Listener {
 
     @EventHandler
     private void onBlockBreak(BlockDropItemEvent event) {
-        HItem hItem = getItem(event.getBlockState().getBlockData());
+        HItem hItem = Hephaestus.getItem(event.getBlockState().getType().getKey());
         if (hItem == null) {
             return;
         }
         if (event.getPlayer().getGameMode() == GameMode.CREATIVE) {
             return;
         }
+        Player player = event.getPlayer();
+        ItemStack toolItem = player.getInventory().getItemInMainHand();
+        Set<String> toolTags = new HashSet<>();
+
+        if (toolItem != null && !toolItem.getType().isAir()) {
+            HItemStack hToolStack = Hephaestus.getStack(toolItem);
+            if (hToolStack != null && hToolStack.getItem() != null) {
+                toolTags.addAll(hToolStack.getItem().getTags());
+            }
+        }
+
+        List<BlockDropEntry> applicableDrops = hItem.getApplicableDrops(toolTags);
+
+        if (applicableDrops.isEmpty()) {
+            return;
+        }
+
+        Random random = new Random();
+        Location dropLocation = event.getBlock().getLocation();
+        // Only clear default drops if we have custom ones
         event.getItems().clear();
-        event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation(), hItem.rollRandomStack().getBukkitStack());
+
+        for (BlockDropEntry dropEntry : applicableDrops) {
+            double roll = random.nextDouble();
+            if (roll > dropEntry.chance()) {
+                continue;
+            }
+
+            int amount = dropEntry.minAmount();
+            if (dropEntry.maxAmount() > dropEntry.minAmount()) {
+                amount = random.nextInt(dropEntry.maxAmount() - dropEntry.minAmount() + 1) + dropEntry.minAmount();
+            }
+
+            HItem dropItem = Hephaestus.INSTANCE.getLibrary().get(dropEntry.itemId());
+            if (dropItem != null) {
+                HItemStack dropStack = dropItem.createStack(amount);
+                event.getBlock().getWorld().dropItemNaturally(dropLocation, dropStack.getBukkitStack());
+            } else {
+                try {
+                    org.bukkit.Material material = org.bukkit.Material.valueOf(dropEntry.itemId().toUpperCase());
+                    ItemStack vanillaStack = new ItemStack(material, amount);
+                    event.getBlock().getWorld().dropItemNaturally(dropLocation, vanillaStack);
+                } catch (IllegalArgumentException e) {
+                    // Item not found, log warning
+                    Hephaestus.INSTANCE.getLogger().warning("Unknown item ID in block drops: " + dropEntry.itemId() + " for block " + hItem.getKey());
+                }
+            }
+        }
     }
 
     @EventHandler
