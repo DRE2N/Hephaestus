@@ -260,6 +260,10 @@ public class EquipmentListener implements Listener {
         if (offHandItem == null || offHandItem.getItem() == null) {
             return;
         }
+        if (!canUse(event.getOffHandItem(), event.getPlayer(), hCharacter)) {
+            event.setCancelled(true);
+            return;
+        }
         if (!Collections.disjoint(offHandItem.getItem().getTags(), hCharacter.getTraitline().getWeaponTags())) {
             hCharacter.switchCastMode(CombatModeReason.HOTKEY, !hCharacter.isInCastMode());
             event.setCancelled(true);
