@@ -643,9 +643,16 @@ public class HItem {
             }
             DataComponentMap defaultComponents = baseItem.components();
             DataComponentPatch.Builder defaultBuilder = DataComponentPatch.builder();
-            for (TypedDataComponent component : defaultComponents) {
-                defaultBuilder.set(component.type(), defaultComponents.get(component.type()));
-            }
+            // Sort components by their registry key to ensure consistent ordering, so we don't cause git diff noise
+            defaultComponents.stream()
+                    .sorted((a, b) -> {
+                        String keyA = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(a.type()).toString();
+                        String keyB = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(b.type()).toString();
+                        return keyA.compareTo(keyB);
+                    })
+                    .forEach(component -> {
+                        defaultBuilder.set(component.type(), defaultComponents.get(component.type()));
+                    });
             DataComponentPatch patchToSave = patch;
             if (!key.getNamespace().equals("minecraft")) {
                 CompoundTag tag = new CompoundTag();
