@@ -314,9 +314,12 @@ public class HItemStack {
         CompoundTag custom = stack.has(DataComponents.CUSTOM_DATA)
                 ? stack.get(DataComponents.CUSTOM_DATA).getUnsafe()
                 : new CompoundTag();
-        if (custom.getString("hephaestus-id").isEmpty()) {
+
+        // Only set hephaestus-id if it's missing or empty - preserve existing custom item IDs
+        if (custom.getString("hephaestus-id").isEmpty() && item != null) {
             custom.putString("hephaestus-id", item.getKey().toString());
         }
+
         CustomData.set(DataComponents.CUSTOM_DATA, stack, custom);
         rebuildAttributes();
         saveChanges();
@@ -475,6 +478,12 @@ public class HItemStack {
             return;
         }
         CompoundTag custom = stack.get(DataComponents.CUSTOM_DATA).getUnsafe();
+
+        // Don't overwrite existing hephaestus-id - this preserves the original custom item ID
+        if (!custom.contains("hephaestus-id") && item != null) {
+            custom.putString("hephaestus-id", item.getKey().toString());
+        }
+
         CompoundTag data = custom.getCompoundOrEmpty("hephaestus-data");
         if (data == null) {
             return;
@@ -511,9 +520,12 @@ public class HItemStack {
 
     public void saveChanges() {
         CompoundTag custom = stack.has(DataComponents.CUSTOM_DATA) ? stack.get(DataComponents.CUSTOM_DATA).getUnsafe() : new CompoundTag();
+
+        // Only set hephaestus-id if it doesn't already exist - preserve existing custom item IDs
         if (!custom.contains("hephaestus-id") && item != null) {
             custom.putString("hephaestus-id", item.getKey().toString());
         }
+
         CompoundTag data = custom.getCompoundOrEmpty("hephaestus-data");
         data.putInt("level", itemLevel);
         data.putString("rarity", rarity.name());
