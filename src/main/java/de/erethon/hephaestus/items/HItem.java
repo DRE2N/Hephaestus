@@ -20,6 +20,7 @@ import de.erethon.spellbook.api.SpellData;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -651,7 +652,7 @@ public class HItem {
                         return keyA.compareTo(keyB);
                     })
                     .forEach(component -> {
-                        defaultBuilder.set(component.type(), defaultComponents.get(component.type()));
+                        addComponentToBuilder(defaultBuilder, component, defaultComponents);
                     });
             DataComponentPatch patchToSave = patch;
             if (!key.getNamespace().equals("minecraft")) {
@@ -679,6 +680,13 @@ public class HItem {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> void addComponentToBuilder(DataComponentPatch.Builder builder, TypedDataComponent<?> component, DataComponentMap components) {
+        DataComponentType<T> type = (DataComponentType<T>) component.type();
+        T value = (T) components.get(type);
+        builder.set(type, value);
     }
 
     public static String serialize(DataComponentPatch patch) {
