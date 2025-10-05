@@ -387,7 +387,7 @@ public class HItemStack {
                             String keyStr = holderKeyOpt.get().location().toString();
                             // Determine level-relevant modifiers (exact or nearest lower) like roll() does
                             var perLevel = entry.getValue();
-                            Map<Double, Integer> levelModifiers = perLevel.get(itemLevel);
+                            Map<double[], Integer> levelModifiers = perLevel.get(itemLevel);
                             if (levelModifiers == null) {
                                 int best = Integer.MIN_VALUE;
                                 for (Integer defined : perLevel.keySet()) {
@@ -400,9 +400,11 @@ public class HItemStack {
                             if (levelModifiers == null || levelModifiers.isEmpty()) continue;
                             double min = Double.POSITIVE_INFINITY;
                             double max = Double.NEGATIVE_INFINITY;
-                            for (Double v : levelModifiers.keySet()) {
-                                if (v < min) min = v;
-                                if (v > max) max = v;
+                            for (double[] range : levelModifiers.keySet()) {
+                                if (range.length >= 2) {
+                                    if (range[0] < min) min = range[0];
+                                    if (range[1] > max) max = range[1];
+                                }
                             }
                             if (min == Double.POSITIVE_INFINITY || max == Double.NEGATIVE_INFINITY) continue;
                             String display = getAttributeTranslationKey(keyStr);

@@ -11,6 +11,92 @@ import java.util.concurrent.ThreadLocalRandom;
 // Some utility methods for randomness and loading weights from a config
 public class HRandom {
 
+    /**
+     * Select a random double value from weighted ranges using a triangular distribution.
+     * Each range has a weight, and within each range values are distributed with a bias toward the center.
+     *
+     * @param rangeWeights Map of (min, max) pairs to their weights
+     * @return A random double value from the weighted ranges
+     */
+    public static double selectWeightedCurveValue(Map<double[], Integer> rangeWeights) {
+        if (rangeWeights == null || rangeWeights.isEmpty()) {
+            throw new IllegalArgumentException("Range weights map cannot be null or empty.");
+        }
+
+        // First, select which range to use based on weights
+        int totalWeight = rangeWeights.values().stream().mapToInt(Integer::intValue).sum();
+        if (totalWeight <= 0) {
+            throw new IllegalArgumentException("Total weight must be positive.");
+        }
+
+        int randomIndex = ThreadLocalRandom.current().nextInt(totalWeight);
+        double[] selectedRange = null;
+        for (Map.Entry<double[], Integer> entry : rangeWeights.entrySet()) {
+            randomIndex -= entry.getValue();
+            if (randomIndex < 0) {
+                selectedRange = entry.getKey();
+                break;
+            }
+        }
+
+        if (selectedRange == null || selectedRange.length < 2) {
+            throw new IllegalStateException("Failed to select a valid range.");
+        }
+
+        double min = selectedRange[0];
+        double max = selectedRange[1];
+
+        // Use triangular distribution within the range (biased toward center)
+        // This creates a smooth curve where middle values are more likely
+        double u1 = ThreadLocalRandom.current().nextDouble();
+        double u2 = ThreadLocalRandom.current().nextDouble();
+        double triangular = (u1 + u2) / 2.0; // Average of two uniform randoms creates triangular
+
+        return min + (max - min) * triangular;
+    }
+
+    /**
+     * Select a random double value from weighted ranges with configurable curve bias.
+     *
+     * @param rangeWeights Map of (min, max) pairs to their weights
+     * @param biasPower   Power to apply to the random value (1.0 = uniform, >1.0 = bias toward min, <1.0 = bias toward max)
+     * @return A random double value from the weighted ranges
+     */
+    public static double selectWeightedCurveValue(Map<double[], Integer> rangeWeights, double biasPower) {
+        if (rangeWeights == null || rangeWeights.isEmpty()) {
+            throw new IllegalArgumentException("Range weights map cannot be null or empty.");
+        }
+
+        // Select which range to use based on weights
+        int totalWeight = rangeWeights.values().stream().mapToInt(Integer::intValue).sum();
+        if (totalWeight <= 0) {
+            throw new IllegalArgumentException("Total weight must be positive.");
+        }
+
+        int randomIndex = ThreadLocalRandom.current().nextInt(totalWeight);
+        double[] selectedRange = null;
+        for (Map.Entry<double[], Integer> entry : rangeWeights.entrySet()) {
+            randomIndex -= entry.getValue();
+            if (randomIndex < 0) {
+                selectedRange = entry.getKey();
+                break;
+            }
+        }
+
+        if (selectedRange == null || selectedRange.length < 2) {
+            throw new IllegalStateException("Failed to select a valid range.");
+        }
+
+        double min = selectedRange[0];
+        double max = selectedRange[1];
+
+        // Apply bias power to create curve
+        double rand = ThreadLocalRandom.current().nextDouble();
+        double biased = Math.pow(rand, biasPower);
+
+        return min + (max - min) * biased;
+    }
+
     public static <T> Map<T, Integer> loadWeights(YamlConfiguration config, String path) {
         Map<T, Integer> weights = new HashMap<>();
 

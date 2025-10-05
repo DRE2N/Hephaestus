@@ -181,10 +181,6 @@ public class HItemLibrary {
         }
         boolean isUpgradeDirectory = directory.equals(upgradeDataDirectory);
         if (isUpgradeDirectory) {
-            for (HItemUpgrade upgrade : upgrades.values()) {
-                File file = new File(directory, upgrade.getId() + ".yml");
-                upgrade.save(file);
-            }
             return;
         }
         for (HItem item : items.values()) {

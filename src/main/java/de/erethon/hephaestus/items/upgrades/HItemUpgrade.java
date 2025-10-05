@@ -23,6 +23,7 @@ public class HItemUpgrade {
     private final Set<String> incompatibleUpgrades = new HashSet<>();
     private final Set<String> requiredUpgrades = new HashSet<>();
     private int minimumLevel = 0;
+    private YamlConfiguration config;
 
     static {
         UPGRADE_CLASSES.put("attribute_modifying", HAttributeModifyingUpgrade.class);
@@ -76,7 +77,7 @@ public class HItemUpgrade {
     }
 
     public YamlConfiguration load(File file) {
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+        config = YamlConfiguration.loadConfiguration(file);
         id = config.getString("id");
         if (config.contains("name")) {
             ConfigurationSection nameSection = config.getConfigurationSection("name");
@@ -110,7 +111,6 @@ public class HItemUpgrade {
     }
 
     public void save(File file) {
-        YamlConfiguration config = new YamlConfiguration();
         config.set("id", id);
         config.set("type", UPGRADE_CLASSES.entrySet().stream().filter(e -> e.getValue().equals(this.getClass())).findFirst().get().getKey());
         try {
