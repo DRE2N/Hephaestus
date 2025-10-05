@@ -82,6 +82,7 @@ public class HItemStack {
 
     public org.bukkit.inventory.ItemStack getBukkitStack() {
         stack.applyComponents(item.getPatch());
+        rebuildAttributes(); // Rebuild attributes after applying patch to ensure upgrade attributes are applied
         saveChanges();
         if (!item.isVanilla()) {
             updateVisuals();
