@@ -1,6 +1,7 @@
 package de.erethon.hephaestus.jobs.crafting;
 
 import de.erethon.bedrock.chat.MessageUtil;
+import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HRarity;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -31,7 +32,7 @@ public class RecipeManager {
         ConfigurationSection recipesSection = config.getConfigurationSection("recipes");
 
         if (recipesSection == null) {
-            MessageUtil.log("No recipes section found in recipes.yml");
+            Hephaestus.log("No recipes section found in recipes.yml");
             return;
         }
 
@@ -47,14 +48,14 @@ public class RecipeManager {
 
                     recipesByJob.computeIfAbsent(recipe.getJobId(), k -> new HashSet<>()).add(recipe.getId());
 
-                    MessageUtil.log("Loaded recipe: " + recipe.getId());
+                    Hephaestus.log("Loaded recipe: " + recipe.getId());
                 } catch (Exception e) {
-                    MessageUtil.log("Failed to load recipe: " + key + " - " + e.getMessage());
+                    Hephaestus.log("Failed to load recipe: " + key + " - " + e.getMessage());
                     e.printStackTrace();
                 }
             }
         }
-        MessageUtil.log("Loaded " + recipes.size() + " recipes from configuration");
+        Hephaestus.log("Loaded " + recipes.size() + " recipes from configuration");
     }
 
     private void createDefaultRecipes() {
@@ -67,9 +68,9 @@ public class RecipeManager {
 
         try {
             config.save(recipesFile);
-            MessageUtil.log("Created default recipes configuration at: " + recipesFile.getPath());
+            Hephaestus.log("Created default recipes configuration at: " + recipesFile.getPath());
         } catch (IOException e) {
-            MessageUtil.log("Failed to create default recipes configuration: " + e.getMessage());
+            Hephaestus.log("Failed to create default recipes configuration: " + e.getMessage());
         }
     }
 

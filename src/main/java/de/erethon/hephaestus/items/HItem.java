@@ -70,6 +70,8 @@ public class HItem {
     private SoundEvent placementSound = null;
     private final Set<String> allowedUpgrades = new HashSet<>();
     private final Set<String> tags = new HashSet<>();
+    // Model
+    private ResourceLocation itemModel = null;
     // Orb system
     private final List<OrbColor> socketColors = new ArrayList<>();
     private OrbColor orbColor = null; // if this item is an orb itself
@@ -434,6 +436,10 @@ public class HItem {
         return tags;
     }
 
+    public ResourceLocation getItemModel() {
+        return itemModel;
+    }
+
     public HItemLibrary getLibrary() {
         return library;
     }
@@ -458,6 +464,9 @@ public class HItem {
             baseItem = BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone"))).get().value();
         } else {
             throw new RuntimeException("Base item not found: " + config.getString("baseItem"));
+        }
+        if (config.contains("model") && config.getString("model", null) != null) {
+            itemModel = ResourceLocation.parse(config.getString("model"));
         }
         if (config.contains("name")) {
             ConfigurationSection nameSection = config.getConfigurationSection("name");
@@ -751,6 +760,5 @@ public class HItem {
         stack.applySocketPattern(pattern);
         stack.setMaxUpgrades(stack.getSockets().size());
     }
-
 
 }

@@ -342,6 +342,9 @@ public class HItemStack {
             nameComponent = PaperAdventure.asVanilla(advComponent);
         }
         stack.set(DataComponents.ITEM_NAME, nameComponent);
+        if (item.getItemModel() != null) {
+            stack.set(DataComponents.ITEM_MODEL, item.getItemModel());
+        }
         List<net.minecraft.network.chat.Component> lore = new ArrayList<>();
         if (itemLevel != 0) {
             Component verticalLine = Component.text(" | ", NamedTextColor.DARK_GRAY);

@@ -92,10 +92,9 @@ public final class Hephaestus extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(blockLibrary, this);
         Bukkit.getPluginManager().registerEvents(equipmentListener, this);
         itemLibrary.load();
-        if (itemLibrary.get(BuiltInRegistries.ITEM.getKey(Items.DIAMOND)) == null) {
-            getLogger().warning("No vanilla items found. Generating default items...");
-            generateDefaultItems();
-        }
+
+        // Always check for and register missing vanilla items
+        generateDefaultItems();
 
         // Initialize vanilla crafting system
         File vanillaRecipesFile = new File(getDataFolder(), "vanilla_recipes.yml");
@@ -133,7 +132,7 @@ public final class Hephaestus extends JavaPlugin {
                 jobDatabaseManager = new JobDatabaseManager(connection);
             }
             catch (Exception e) {
-                Hecate.log("Failed to connect to database. Hecate will not work.");
+                Hephaestus.log("Failed to connect to database. Hecate will not work.");
                 e.printStackTrace();
                 return;
             }
@@ -174,15 +173,25 @@ public final class Hephaestus extends JavaPlugin {
     }
 
     private void generateDefaultItems() {
-        getLogger().info("Generating default items... This may take a while.");
-        int count = 0;
+        getLogger().info("Checking for missing vanilla items...");
+        int newCount = 0;
+        int totalCount = 0;
         for (Item item : BuiltInRegistries.ITEM.stream().toList()) {
-            itemLibrary.register(new ItemStack(item), BuiltInRegistries.ITEM.getKey(item));
-            getLogger().info("Registered " + BuiltInRegistries.ITEM.getKey(item));
-            count++;
+            totalCount++;
+            ResourceLocation itemKey = BuiltInRegistries.ITEM.getKey(item);
+            // Only register items that don't already exist
+            if (itemLibrary.get(itemKey) == null) {
+                itemLibrary.register(new ItemStack(item), itemKey);
+                getLogger().info("Registered new vanilla item: " + itemKey);
+                newCount++;
+            }
         }
-        getLogger().info("Generated " + count + " default items.");
-        itemLibrary.save();
+        if (newCount > 0) {
+            getLogger().info("Registered " + newCount + " new vanilla items out of " + totalCount + " total.");
+            itemLibrary.save();
+        } else {
+            getLogger().info("All " + totalCount + " vanilla items are already registered.");
+        }
     }
 
     public JobManager getJobManager() {
@@ -207,5 +216,9 @@ public final class Hephaestus extends JavaPlugin {
 
     public VanillaRecipeManager getVanillaRecipeManager() {
         return vanillaRecipeManager;
+    }
+
+    public static void log(String message) {
+        INSTANCE.getLogger().info(message);
     }
 }

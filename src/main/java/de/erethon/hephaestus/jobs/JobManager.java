@@ -31,7 +31,7 @@ public class JobManager {
         ConfigurationSection jobsSection = config.getConfigurationSection("jobs");
 
         if (jobsSection == null) {
-            MessageUtil.log("No jobs section found in jobs.yml");
+            Hephaestus.log("No jobs section found in jobs.yml");
             return;
         }
 
@@ -45,14 +45,14 @@ public class JobManager {
 
                     registerJobTranslations(job);
 
-                    MessageUtil.log("Loaded job: " + job.getId());
+                    Hephaestus.log("Loaded job: " + job.getId());
                 } catch (Exception e) {
-                    MessageUtil.log("Failed to load job: " + key + " - " + e.getMessage());
+                    Hephaestus.log("Failed to load job: " + key + " - " + e.getMessage());
                     e.printStackTrace();
                 }
             }
         }
-        MessageUtil.log("Loaded " + jobs.size() + " jobs from configuration");
+        Hephaestus.log("Loaded " + jobs.size() + " jobs from configuration");
     }
 
     private void registerJobTranslations(HJob job) {
@@ -129,9 +129,9 @@ public class JobManager {
 
         try {
             config.save(configFile);
-            MessageUtil.log("Created default jobs configuration at: " + configFile.getPath());
+            Hephaestus.log("Created default jobs configuration at: " + configFile.getPath());
         } catch (IOException e) {
-            MessageUtil.log("Failed to create default jobs configuration: " + e.getMessage());
+            Hephaestus.log("Failed to create default jobs configuration: " + e.getMessage());
         }
     }
 
@@ -151,7 +151,7 @@ public class JobManager {
         return databaseManager.setCharacterJob(characterUuid, jobId)
                 .thenApply(v -> true)
                 .exceptionally(throwable -> {
-                    MessageUtil.log("Failed to set character job: " + throwable.getMessage());
+                    Hephaestus.log("Failed to set character job: " + throwable.getMessage());
                     return false;
                 });
     }
@@ -165,7 +165,7 @@ public class JobManager {
         return databaseManager.removeCharacterJob(characterUuid)
                 .thenApply(v -> true)
                 .exceptionally(throwable -> {
-                    MessageUtil.log("Failed to remove character job: " + throwable.getMessage());
+                    Hephaestus.log("Failed to remove character job: " + throwable.getMessage());
                     return false;
                 });
     }

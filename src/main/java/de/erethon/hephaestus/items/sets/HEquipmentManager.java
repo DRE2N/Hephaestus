@@ -1,6 +1,7 @@
 package de.erethon.hephaestus.items.sets;
 
 import de.erethon.hecate.Hecate;
+import de.erethon.hephaestus.Hephaestus;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -15,7 +16,7 @@ public class HEquipmentManager {
 
     public HEquipmentManager(File file) {
         if (!file.exists()) {
-            Hecate.log("Equipment configuration file not found: " + file.getAbsolutePath());
+            Hephaestus.log("Equipment configuration file not found: " + file.getAbsolutePath());
             return;
         }
         this.cfg = YamlConfiguration.loadConfiguration(file);
@@ -33,7 +34,7 @@ public class HEquipmentManager {
     private void load() {
         ConfigurationSection section = cfg.getConfigurationSection("equipmentSets");
         if (section == null) {
-            Hecate.log("No equipment sets found in configuration.");
+            Hephaestus.log("No equipment sets found in configuration.");
             return;
         }
         for (String key : section.getKeys(false)) {
