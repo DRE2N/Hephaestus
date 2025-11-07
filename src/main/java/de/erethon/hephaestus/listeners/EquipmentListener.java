@@ -10,6 +10,7 @@ import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.items.sets.EquipmentSet;
+import de.erethon.papyrus.events.ItemModifierAddEvent;
 import de.erethon.spellbook.api.TraitData;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import org.bukkit.Material;
@@ -33,7 +34,6 @@ import java.util.Set;
 
 public class EquipmentListener implements Listener {
 
-    private final Hecate hecate = Hecate.getInstance();
     private final Hephaestus plugin = Hephaestus.INSTANCE;
 
     @EventHandler
@@ -179,6 +179,21 @@ public class EquipmentListener implements Listener {
         }
     }
 
+    @EventHandler
+    private void onAttributeApply(ItemModifierAddEvent event)  {
+        if (!(event.getLivingEntity() instanceof Player player)) {
+            return;
+        }
+        HCharacter hCharacter = getCharacterFromPlayer(player);
+        if (hCharacter == null) {
+            return;
+        }
+        ItemStack item = event.getItemStack();
+        if (!canUse(item, player, hCharacter) || !canEquipLevel(player, item, hCharacter)) {
+            event.setCancelled(true);
+        }
+    }
+
     private boolean canEquipLevel(Player player, ItemStack item, HCharacter character) {
         int characterLevel = character.getLevel();
         HItemStack stack = Hephaestus.getStack(item);
@@ -239,12 +254,14 @@ public class EquipmentListener implements Listener {
     }
 
     private HCharacter getCharacterFromPlayer(Player player) {
+        Hecate hecate = Hecate.getInstance();
         HPlayer hPlayer = hecate.getDatabaseManager().getHPlayer(player);
         return hPlayer.getSelectedCharacter();
     }
 
     @EventHandler
     public void onModeSwitch(PlayerSwapHandItemsEvent event) {
+        Hecate hecate = Hecate.getInstance();
         // The OffHandItem is the item that WOULD BE in the offhand if the event is not cancelled. Thanks Spigot for great method naming!
         HCharacter hCharacter = hecate.getDatabaseManager().getCurrentCharacter(event.getPlayer());
         if (hCharacter == null) {
