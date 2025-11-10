@@ -2,16 +2,25 @@ package de.erethon.hephaestus.jobs.crafting.gui;
 
 import de.erethon.hecate.data.HCharacter;
 import de.erethon.hephaestus.Hephaestus;
+import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
 import de.erethon.hephaestus.jobs.crafting.JobRecipe;
 import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
+import de.erethon.hephaestus.jobs.crafting.RecipeIngredient;
 import de.erethon.hephaestus.jobs.crafting.RecipeManager;
+import de.erethon.hephaestus.jobs.crafting.RecipeResult;
+import io.papermc.paper.datacomponent.DataComponentType;
 import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.ItemLore;
+import io.papermc.paper.datacomponent.item.TooltipDisplay;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.kyori.adventure.translation.GlobalTranslator;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -40,32 +49,43 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
     private List<JobRecipe> availableRecipes = new ArrayList<>();
     private int currentPage = 0;
     private JobRecipe selectedRecipe = null;
-    private int craftQuantity = 1; // New field for bulk crafting
+    private int craftQuantity = 1;
     private BukkitTask craftingTask = null;
 
     private JobRecipe currentlyCrafting = null;
+    private RecipeResult craftingResult = null;
     private int craftingProgress = 0;
     private int totalCraftingTime = 0;
     private BukkitTask progressTask = null;
 
-    private static final int[] CRAFTING_SLOTS = {1, 2, 3, 10, 11, 12, 19, 20, 21};
-    private static final int CRAFT_RESULT_SLOT = 16;
-    private static final int CRAFT_BUTTON_SLOT = 25;
-    private static final int DISCOVERY_BUTTON_SLOT = 49;
+    // Ingredient slots - 3 rows x 2 columns on the left (6 slots total, vertical layout)
+    private static final int[] CRAFTING_SLOTS = {0, 1, 9, 10, 18, 19};
 
-    // New slots for quantity controls
-    private static final int QUANTITY_DECREASE_SLOT = 6;
-    private static final int QUANTITY_DISPLAY_SLOT = 7;
-    private static final int QUANTITY_INCREASE_SLOT = 8;
-
+    // Recipe display slots - 3 columns x 5 rows on the right side
     private static final int[] ACTUAL_RECIPE_SLOTS = {
-        36, 37, 38, 39, 40, 41, 42, 43, 44,
-        45, 46, 47, 48, 49, 50, 51, 52, 53
+        5, 6, 7, 8,
+        14, 15, 16, 17,
+        23, 24, 25, 26,
+        32, 33, 34, 35,
+        41, 42, 43, 44
     };
 
-    private static final int RECIPES_PER_PAGE = 18;
-    private static final int PREV_PAGE_SLOT = 33;
-    private static final int NEXT_PAGE_SLOT = 35;
+    // UI controls - Minecraft-style layout
+    private static final int CRAFT_RESULT_SLOT = 3; // Right of ingredients, Minecraft-style
+
+    // Control buttons in lower left area
+    private static final int CRAFT_BUTTON_SLOT = 12; // Center
+    private static final int DISCOVERY_BUTTON_SLOT = 47;
+
+    private static final int QUANTITY_DECREASE_SLOT = 37; // Bottom left corner
+    private static final int QUANTITY_DISPLAY_SLOT = 38;
+    private static final int QUANTITY_INCREASE_SLOT = 39;
+
+    // Navigation buttons below the recipe list (bottom right)
+    private static final int PREV_PAGE_SLOT = 50;
+    private static final int NEXT_PAGE_SLOT = 53;
+
+    private static final int RECIPES_PER_PAGE = 20;
 
     public CraftingStationGUI(Hephaestus plugin, Player player) {
         this.plugin = plugin;
@@ -81,12 +101,19 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
     }
 
     private void setupInterface() {
-        ItemStack background = createGuiItem(Material.GRAY_STAINED_GLASS_PANE, " ");
+        // Fill all slots with dummy items first
+        ItemStack dummy = getDummyItem();
         for (int i = 0; i < 54; i++) {
-            inventory.setItem(i, background);
+            inventory.setItem(i, dummy);
         }
 
+        // Clear ingredient slots (no backgrounds)
         for (int slot : CRAFTING_SLOTS) {
+            inventory.setItem(slot, null);
+        }
+
+        // Clear recipe display slots
+        for (int slot : ACTUAL_RECIPE_SLOTS) {
             inventory.setItem(slot, null);
         }
 
@@ -95,6 +122,13 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         setupResultSlot();
         setupQuantityControls();
         setupNavigationButtons();
+    }
+
+    private static ItemStack getDummyItem() {
+        ItemStack dummy = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        //dummy.setData(DataComponentTypes.ITEM_MODEL, NamespacedKey.minecraft("air"));
+        dummy.setData(DataComponentTypes.TOOLTIP_DISPLAY, TooltipDisplay.tooltipDisplay().hideTooltip(true));
+        return dummy;
     }
 
     private void setupQuantityControls() {
@@ -128,7 +162,14 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
                 lore.add(Component.translatable("hephaestus.crafting.gui.quantity.display.total_ingredients"));
                 for (var ingredient : selectedRecipe.getIngredients()) {
                     int totalNeeded = ingredient.getAmount() * craftQuantity;
-                    lore.add(Component.text("• " + totalNeeded + "x " + ingredient.getItemId(), NamedTextColor.GRAY));
+
+                    if (ingredient.isChoice()) {
+                        String choiceName = ingredient.getChoice().getChoiceId();
+                        lore.add(Component.text("• " + totalNeeded + "x " + choiceName + " (any)", NamedTextColor.GRAY));
+                    } else {
+                        String itemName = getItemDisplayName(ingredient.getItemId());
+                        lore.add(Component.text("• " + totalNeeded + "x " + itemName, NamedTextColor.GRAY));
+                    }
                 }
             }
             meta.lore(lore);
@@ -139,6 +180,18 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         quantityDisplay.setAmount(Math.max(1, Math.min(99, craftQuantity)));
 
         inventory.setItem(QUANTITY_DISPLAY_SLOT, quantityDisplay);
+    }
+
+    /**
+     * Helper method to get the display name of an item from its ID.
+     */
+    private String getItemDisplayName(String itemId) {
+        if (itemId == null) {
+            return "unknown";
+        }
+        String id = itemId.replace(":", ".");
+        Component displayName = GlobalTranslator.render(Component.translatable("hephaestus.item." + id + ".name"), player.locale());
+        return PlainTextComponentSerializer.plainText().serialize(displayName);
     }
 
     private void setupDiscoveryButton() {
@@ -223,24 +276,41 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
                     Set<String> discovered = discoveredFuture.get();
                     int level = levelFuture.get();
 
-                    availableRecipes = recipeManager.getRecipesForJob(jobId).stream()
-                        .filter(recipe -> discovered.contains(recipe.getId()))
-                        .filter(recipe -> recipe.getRequiredLevel() <= level)
+                    plugin.getLogger().info("Loading recipes for player " + player.getName() + " - JobID: " + jobId + ", Level: " + level);
+                    plugin.getLogger().info("Discovered recipes: " + discovered);
+
+                    List<JobRecipe> allJobRecipes = recipeManager.getRecipesForJob(jobId);
+                    plugin.getLogger().info("Total recipes for job '" + jobId + "': " + allJobRecipes.size());
+
+                    availableRecipes = allJobRecipes.stream()
+                        .filter(recipe -> {
+                            boolean isDiscovered = discovered.contains(recipe.getId());
+                            boolean levelOk = recipe.getRequiredLevel() <= level;
+                            if (!isDiscovered) {
+                                plugin.getLogger().info("Recipe '" + recipe.getId() + "' not discovered yet");
+                            }
+                            if (!levelOk) {
+                                plugin.getLogger().info("Recipe '" + recipe.getId() + "' requires level " + recipe.getRequiredLevel() + " (player level: " + level + ")");
+                            }
+                            return isDiscovered && levelOk;
+                        })
                         .sorted(Comparator.comparing(JobRecipe::getRequiredLevel))
                         .toList();
 
+                    plugin.getLogger().info("Available recipes for GUI: " + availableRecipes.size());
                     updateRecipeDisplay();
                 } catch (Exception e) {
                     plugin.getLogger().warning("Failed to load player recipes: " + e.getMessage());
+                    e.printStackTrace();
                 }
             });
         });
     }
 
     private void updateRecipeDisplay() {
+        // Clear all recipe slots
         for (int slot : ACTUAL_RECIPE_SLOTS) {
-            ItemStack background = createGuiItem(Material.GRAY_STAINED_GLASS_PANE, " ");
-            inventory.setItem(slot, background);
+            inventory.setItem(slot, null);
         }
 
         int startIndex = currentPage * RECIPES_PER_PAGE;
@@ -260,19 +330,27 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
     }
 
     private ItemStack createRecipeDisplayItem(JobRecipe recipe) {
-        HItemStack resultStack = plugin.getLibrary().get(recipe.getResult().getItemId())
-            .createStack(1, recipe.getResult().getItemLevel(),
-                        recipe.getResult().getSocketPattern(), recipe.getResult().getRarity());
-
         ItemStack displayItem;
-        if (resultStack != null) {
-            displayItem = resultStack.getBukkitStack().clone();
+
+        // Use getDisplayResult() to handle both fixed and dynamic recipes
+        RecipeResult displayResult = recipe.getDisplayResult();
+
+        if (displayResult != null) {
+            HItemStack resultStack = plugin.getLibrary().get(displayResult.getItemId())
+                .createStack(1, displayResult.getItemLevel(),
+                            displayResult.getSocketPattern(), displayResult.getRarity());
+
+            if (resultStack != null) {
+                displayItem = resultStack.getBukkitStack().clone();
+            } else {
+                displayItem = new ItemStack(Material.CRAFTING_TABLE);
+            }
         } else {
             displayItem = new ItemStack(Material.CRAFTING_TABLE);
         }
 
-        ItemMeta meta = displayItem.getItemMeta();
-        meta.displayName(Component.text(recipe.getId(), NamedTextColor.WHITE));
+        String resultId = (displayResult != null ? displayResult.getItemId() : "unknown").replace(":", ".");
+        displayItem.setData(DataComponentTypes.ITEM_NAME, Component.translatable("hephaestus.item." + resultId + ".name"));
 
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("Level: " + recipe.getRequiredLevel(), NamedTextColor.YELLOW));
@@ -282,13 +360,24 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         lore.add(Component.text("Ingredients:", NamedTextColor.GRAY));
 
         for (var ingredient : recipe.getIngredients()) {
-            lore.add(Component.text("• " + ingredient.getAmount() + "x " + ingredient.getItemId(), NamedTextColor.WHITE));
+            if (ingredient.isChoice()) {
+                // Show choice ingredient with all options
+                lore.add(Component.text("• " + ingredient.getAmount() + "x (any of):", NamedTextColor.AQUA));
+                for (var option : ingredient.getChoice().getOptions()) {
+                    String itemName = getItemDisplayName(option.getItemId());
+                    String level = option.getMinLevel() > 0 ? " (Level " + option.getMinLevel() + ")" : "";
+                    lore.add(Component.text("  - " + itemName + level, NamedTextColor.GRAY));
+                }
+            } else {
+                // Show fixed ingredient with proper name
+                String itemName = getItemDisplayName(ingredient.getItemId());
+                lore.add(Component.text("• " + ingredient.getAmount() + "x " + itemName, NamedTextColor.WHITE));
+            }
         }
 
         lore.add(Component.text(""));
         lore.add(Component.text("Click to select", NamedTextColor.GREEN));
-        meta.lore(lore);
-        displayItem.setItemMeta(meta);
+        displayItem.setData(DataComponentTypes.LORE, ItemLore.lore(lore));
 
         return displayItem;
     }
@@ -388,14 +477,26 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
     private void updateResultDisplay() {
         if (selectedRecipe != null) {
-            HItemStack resultStack = plugin.getLibrary().get(selectedRecipe.getResult().getItemId())
-                .createStack(selectedRecipe.getResult().getAmount() * craftQuantity, selectedRecipe.getResult().getItemLevel(),
-                            selectedRecipe.getResult().getSocketPattern(), selectedRecipe.getResult().getRarity());
+            // Calculate result based on current ingredients
+            List<ItemStack> ingredients = getIngredientsFromSlots();
+            RecipeResult result;
 
-            if (resultStack != null) {
-                ItemStack displayStack = resultStack.getBukkitStack();
-                displayStack.setAmount(Math.max(1, Math.min(99, selectedRecipe.getResult().getAmount() * craftQuantity)));
-                inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+            if (!ingredients.isEmpty()) {
+                result = selectedRecipe.calculateResult(ingredients);
+            } else {
+                result = selectedRecipe.getDisplayResult();
+            }
+
+            if (result != null) {
+                HItemStack resultStack = plugin.getLibrary().get(result.getItemId())
+                    .createStack(result.getAmount() * craftQuantity, result.getItemLevel(),
+                                result.getSocketPattern(), result.getRarity());
+
+                if (resultStack != null) {
+                    ItemStack displayStack = resultStack.getBukkitStack();
+                    displayStack.setAmount(Math.max(1, Math.min(99, result.getAmount() * craftQuantity)));
+                    inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+                }
             }
         }
     }
@@ -405,7 +506,14 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
         for (var ingredient : selectedRecipe.getIngredients()) {
             int totalRequired = ingredient.getAmount() * craftQuantity;
-            int available = countItemsInCraftingSlots(ingredient.getItemId());
+            int available;
+
+            if (ingredient.isChoice()) {
+                available = countChoiceItemsInCraftingSlots(ingredient);
+            } else {
+                available = countItemsInCraftingSlots(ingredient.getItemId());
+            }
+
             if (available < totalRequired) {
                 return false;
             }
@@ -429,14 +537,30 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         this.selectedRecipe = recipe;
         this.craftQuantity = 1; // Reset quantity when selecting new recipe
 
-        HItemStack resultStack = plugin.getLibrary().get(recipe.getResult().getItemId())
-            .createStack(recipe.getResult().getAmount() * craftQuantity, recipe.getResult().getItemLevel(),
-                        recipe.getResult().getSocketPattern(), recipe.getResult().getRarity());
+        // Calculate result based on ingredients (handles both fixed and dynamic results)
+        List<ItemStack> ingredients = getIngredientsFromSlots();
+        RecipeResult result;
 
-        if (resultStack != null) {
-            ItemStack displayStack = resultStack.getBukkitStack();
-            displayStack.setAmount(Math.max(1, Math.min(99, recipe.getResult().getAmount() * craftQuantity)));
-            inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+        // If we have ingredients, calculate based on them; otherwise use display result
+        if (!ingredients.isEmpty()) {
+            result = recipe.calculateResult(ingredients);
+        } else {
+            result = recipe.getDisplayResult();
+        }
+
+        if (result != null) {
+            HItemStack resultStack = plugin.getLibrary().get(result.getItemId())
+                .createStack(result.getAmount() * craftQuantity, result.getItemLevel(),
+                            result.getSocketPattern(), result.getRarity());
+
+            if (resultStack != null) {
+                ItemStack displayStack = resultStack.getBukkitStack();
+                displayStack.setAmount(Math.max(1, Math.min(99, result.getAmount() * craftQuantity)));
+                inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+            }
+        } else {
+            // No result available (shouldn't happen, but handle gracefully)
+            inventory.setItem(CRAFT_RESULT_SLOT, new ItemStack(Material.BARRIER));
         }
 
         updateQuantityDisplay();
@@ -458,14 +582,25 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         for (var ingredient : selectedRecipe.getIngredients()) {
             int requiredPerCraft = ingredient.getAmount();
             int totalRequired = requiredPerCraft * craftQuantity;
-            int available = countItemsInCraftingSlots(ingredient.getItemId());
+            int available;
+            String ingredientName;
+
+            if (ingredient.isChoice()) {
+                // For choice ingredients, count items from any option in the choice
+                available = countChoiceItemsInCraftingSlots(ingredient);
+                ingredientName = ingredient.getChoice().getChoiceId() + " (any)";
+            } else {
+                // For fixed ingredients - use display name
+                available = countItemsInCraftingSlots(ingredient.getItemId());
+                ingredientName = getItemDisplayName(ingredient.getItemId());
+            }
 
             Component ingredientLine;
             if (available >= totalRequired) {
-                ingredientLine = Component.text("✓ " + totalRequired + "x " + ingredient.getItemId() +
+                ingredientLine = Component.text("✓ " + totalRequired + "x " + ingredientName +
                     " (" + requiredPerCraft + " each)", NamedTextColor.GREEN);
             } else {
-                ingredientLine = Component.text("✗ " + available + "/" + totalRequired + "x " + ingredient.getItemId() +
+                ingredientLine = Component.text("✗ " + available + "/" + totalRequired + "x " + ingredientName +
                     " (" + requiredPerCraft + " each)", NamedTextColor.RED);
                 canCraft = false;
             }
@@ -477,8 +612,9 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
             lore.add(Component.text("Place ingredients in crafting slots!", NamedTextColor.RED));
         } else {
             lore.add(Component.text(""));
+            int totalTime = calculateTotalCraftingTime(selectedRecipe.getCraftingTime(), craftQuantity);
             lore.add(Component.text("Total crafting time: " +
-                ((selectedRecipe.getCraftingTime() * craftQuantity) / 20.0) + "s", NamedTextColor.YELLOW));
+                (totalTime / 20.0) + "s", NamedTextColor.YELLOW));
         }
 
         ItemStack craftButton = createGuiItem(Material.ANVIL, canCraft ? "Craft " + craftQuantity + "x Items" : "Missing Ingredients");
@@ -502,10 +638,60 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         return count;
     }
 
+    private int countChoiceItemsInCraftingSlots(RecipeIngredient ingredient) {
+        if (!ingredient.isChoice()) {
+            return 0;
+        }
+
+        int count = 0;
+        for (int slot : CRAFTING_SLOTS) {
+            ItemStack item = inventory.getItem(slot);
+            if (item == null) continue;
+
+            HItemStack hStack = HItemStack.getFromStack(item);
+            if (hStack != null) {
+                String itemId = hStack.getItem().getKey().toString();
+                if (ingredient.matches(itemId)) {
+                    count += item.getAmount();
+                }
+            }
+        }
+        return count;
+    }
+
+    private List<ItemStack> getIngredientsFromSlots() {
+        List<ItemStack> ingredients = new ArrayList<>();
+        for (int slot : CRAFTING_SLOTS) {
+            ItemStack item = inventory.getItem(slot);
+            if (item != null && !item.getType().isAir()) {
+                ingredients.add(item);
+            }
+        }
+        return ingredients;
+    }
+
     private void updateCraftingState() {
         if (selectedRecipe != null) {
             updateCraftButton();
         }
+    }
+
+    /**
+     * Calculate total crafting time with diminishing returns for bulk crafting.
+     * Uses a logarithmic scale to prevent excessive wait times.
+     * Formula: baseTime * (1 + log2(quantity))
+     * Examples:
+     * - 1 item: 1.0x base time
+     * - 5 items: ~3.3x base time (instead of 5x)
+     * - 10 items: ~4.3x base time (instead of 10x)
+     * - 20 items: ~5.4x base time (instead of 20x)
+     */
+    private int calculateTotalCraftingTime(int baseTime, int quantity) {
+        if (quantity <= 1) {
+            return baseTime;
+        }
+        double multiplier = 1.0 + (Math.log(quantity) / Math.log(2));
+        return (int) Math.ceil(baseTime * multiplier);
     }
 
     private void startCrafting() {
@@ -519,6 +705,15 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
             return;
         }
 
+        // Calculate result BEFORE consuming ingredients (for dynamic recipes)
+        List<ItemStack> ingredients = getIngredientsFromSlots();
+        RecipeResult calculatedResult = selectedRecipe.calculateResult(ingredients);
+
+        if (calculatedResult == null) {
+            player.sendMessage(Component.text("Cannot determine recipe result!", NamedTextColor.RED));
+            return;
+        }
+
         // Consume ingredients for the total quantity
         if (!consumeIngredients()) {
             player.sendMessage(Component.text("Failed to consume ingredients!", NamedTextColor.RED));
@@ -526,8 +721,9 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         }
 
         currentlyCrafting = selectedRecipe;
+        craftingResult = calculatedResult; // Store the result for later use
         craftingProgress = 0;
-        totalCraftingTime = selectedRecipe.getCraftingTime() * craftQuantity;
+        totalCraftingTime = calculateTotalCraftingTime(selectedRecipe.getCraftingTime(), craftQuantity);
 
         player.sendMessage(Component.text("Started crafting " + craftQuantity + "x " + selectedRecipe.getId() + "...", NamedTextColor.GREEN));
         player.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 1.0f, 1.0f);
@@ -573,47 +769,61 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
     }
 
     private boolean consumeIngredients() {
-        Map<String, Integer> requiredAmounts = new HashMap<>();
+        // Build a list of amounts needed per ingredient (supports choice ingredients)
+        List<Integer> requiredAmounts = new ArrayList<>();
         for (var ingredient : selectedRecipe.getIngredients()) {
-            requiredAmounts.put(ingredient.getItemId(), ingredient.getAmount() * craftQuantity);
+            requiredAmounts.add(ingredient.getAmount() * craftQuantity);
         }
 
-        // Check if we have enough of each ingredient
-        Map<String, Integer> availableAmounts = new HashMap<>();
-        for (int slot : CRAFTING_SLOTS) {
-            ItemStack item = inventory.getItem(slot);
-            if (item == null) continue;
+        // Check if we have enough of each ingredient and track what to consume
+        List<Map<Integer, Integer>> consumptionPlan = new ArrayList<>(); // List of slot->amount maps
 
-            HItemStack hStack = HItemStack.getFromStack(item);
-            if (hStack != null) {
-                String itemId = hStack.getItem().getKey().toString();
-                availableAmounts.put(itemId, availableAmounts.getOrDefault(itemId, 0) + item.getAmount());
+        for (int i = 0; i < selectedRecipe.getIngredients().size(); i++) {
+            RecipeIngredient ingredient = selectedRecipe.getIngredients().get(i);
+            int needed = requiredAmounts.get(i);
+            int found = 0;
+            Map<Integer, Integer> slotConsumption = new HashMap<>();
+
+            // Find items in slots that match this ingredient
+            for (int slot : CRAFTING_SLOTS) {
+                if (found >= needed) break;
+
+                ItemStack item = inventory.getItem(slot);
+                if (item == null) continue;
+
+                HItemStack hStack = HItemStack.getFromStack(item);
+                if (hStack != null) {
+                    String itemId = hStack.getItem().getKey().toString();
+
+                    // Check if this item matches (handles both fixed and choice)
+                    if (ingredient.matches(itemId)) {
+                        int toTake = Math.min(item.getAmount(), needed - found);
+                        slotConsumption.put(slot, toTake);
+                        found += toTake;
+                    }
+                }
             }
-        }
 
-        for (Map.Entry<String, Integer> required : requiredAmounts.entrySet()) {
-            if (availableAmounts.getOrDefault(required.getKey(), 0) < required.getValue()) {
+            // If we didn't find enough, fail
+            if (found < needed) {
                 return false;
             }
+
+            consumptionPlan.add(slotConsumption);
         }
 
-        // Actually consume the ingredients
-        Map<String, Integer> toConsume = new HashMap<>(requiredAmounts);
-        for (int slot : CRAFTING_SLOTS) {
-            ItemStack item = inventory.getItem(slot);
-            if (item == null) continue;
+        // All checks passed, actually consume the items
+        for (Map<Integer, Integer> slotConsumption : consumptionPlan) {
+            for (Map.Entry<Integer, Integer> entry : slotConsumption.entrySet()) {
+                int slot = entry.getKey();
+                int amount = entry.getValue();
 
-            HItemStack hStack = HItemStack.getFromStack(item);
-            if (hStack != null) {
-                String itemId = hStack.getItem().getKey().toString();
-                if (toConsume.containsKey(itemId) && toConsume.get(itemId) > 0) {
-                    int consumeAmount = Math.min(item.getAmount(), toConsume.get(itemId));
-                    toConsume.put(itemId, toConsume.get(itemId) - consumeAmount);
-
-                    if (item.getAmount() <= consumeAmount) {
+                ItemStack item = inventory.getItem(slot);
+                if (item != null) {
+                    if (item.getAmount() <= amount) {
                         inventory.setItem(slot, null);
                     } else {
-                        item.setAmount(item.getAmount() - consumeAmount);
+                        item.setAmount(item.getAmount() - amount);
                     }
                 }
             }
@@ -626,7 +836,10 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
 
         int completedQuantity = craftQuantity; // Store the quantity that was crafted
+        RecipeResult result = craftingResult; // Use the stored result
+
         currentlyCrafting = null;
+        craftingResult = null;
         craftingProgress = 0;
         totalCraftingTime = 0;
 
@@ -659,13 +872,13 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
                     })
                     .thenAccept(totalXp -> {
                         // Create the result items with proper quantity
-                        int totalResultAmount = recipe.getResult().getAmount() * completedQuantity;
+                        int totalResultAmount = result.getAmount() * completedQuantity;
 
                         // Split into stacks if necessary (max stack size considerations)
                         while (totalResultAmount > 0) {
-                            HItemStack resultStack = plugin.getLibrary().get(recipe.getResult().getItemId())
-                                    .createStack(Math.min(totalResultAmount, 64), recipe.getResult().getItemLevel(),
-                                            recipe.getResult().getSocketPattern(), recipe.getResult().getRarity());
+                            HItemStack resultStack = plugin.getLibrary().get(result.getItemId())
+                                    .createStack(Math.min(totalResultAmount, 64), result.getItemLevel(),
+                                            result.getSocketPattern(), result.getRarity());
 
                             if (resultStack != null) {
                                 ItemStack bukkitStack = resultStack.getBukkitStack();
@@ -681,12 +894,10 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
                             " (+" + totalXp + " XP)", NamedTextColor.GREEN));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.2f);
 
-                        // Reset the crafting UI
+                        // Reopen the GUI to ensure everything is properly reset
                         Bukkit.getScheduler().runTask(plugin, () -> {
-                            craftQuantity = 1; // Reset to 1 after crafting
-                            if (selectedRecipe != null) {
-                                selectRecipe(selectedRecipe);
-                            }
+                            player.closeInventory();
+                            new CraftingStationGUI(plugin, player).open();
                         });
                     });
         });

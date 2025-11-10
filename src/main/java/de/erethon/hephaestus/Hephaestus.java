@@ -141,8 +141,8 @@ public final class Hephaestus extends JavaPlugin {
             jobManager = new JobManager(jobDatabaseManager, jobsFile);
 
             // Initialize crafting system
-            File recipesFile = new File(getDataFolder(), "recipes.yml");
-            recipeManager = new RecipeManager(recipesFile);
+            File recipesDirectory = new File(getDataFolder(), "recipes");
+            recipeManager = new RecipeManager(recipesDirectory);
             playerCraftingProgress = new PlayerCraftingProgress(jobDatabaseManager);
 
             getLogger().info("Job system initialized successfully");

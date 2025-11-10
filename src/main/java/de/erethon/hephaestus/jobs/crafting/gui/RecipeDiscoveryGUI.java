@@ -3,6 +3,7 @@ package de.erethon.hephaestus.jobs.crafting.gui;
 import de.erethon.hecate.data.HCharacter;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.jobs.CharacterJob;
 import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
 import de.erethon.hephaestus.jobs.crafting.JobRecipe;
 import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
@@ -160,6 +161,22 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
             return;
         }
 
+        plugin.getLogger().info("Attempting recipe discovery for player " + player.getName());
+        plugin.getLogger().info("Ingredients provided: " + ingredients.size());
+
+        // Debug: log each ingredient
+        for (int i = 0; i < ingredients.size(); i++) {
+            ItemStack stack = ingredients.get(i);
+            plugin.getLogger().info("  Ingredient " + i + ": " + stack.getType() + " x" + stack.getAmount());
+            HItemStack hStack = HItemStack.getFromStack(stack);
+            if (hStack != null) {
+                String itemId = hStack.getItem().getKey().toString();
+                plugin.getLogger().info("    -> HItemStack ID: " + itemId);
+            } else {
+                plugin.getLogger().info("    -> Not an HItemStack (vanilla item)");
+            }
+        }
+
         JobCharacterBridgeUtil.getCharacterJobRecord(player).thenAccept(characterJob -> {
             if (characterJob == null) {
                 player.sendMessage(Component.text("You need a job to discover recipes!", NamedTextColor.RED));
@@ -167,43 +184,121 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
             }
 
             String jobId = characterJob.job().getId();
-            // Use the new discovery method that supports multiple ingredients
-            JobRecipe discoveredRecipe = recipeManager.discoverRecipeWithIngredients(jobId, ingredients);
+            plugin.getLogger().info("Player job: " + jobId);
 
-            if (discoveredRecipe == null) {
+            // Use the new discovery method that returns ALL recipes with matching ingredients
+            List<JobRecipe> discoveredRecipes = recipeManager.discoverAllRecipesWithIngredients(jobId, ingredients);
+
+            if (discoveredRecipes.isEmpty()) {
+                plugin.getLogger().info("No recipes discovered with these ingredients.");
                 player.sendMessage(Component.text("No recipe discovered with these ingredients.", NamedTextColor.YELLOW));
                 setResultSlot(null);
                 return;
             }
 
+            plugin.getLogger().info("Found " + discoveredRecipes.size() + " recipe(s) with matching ingredients");
+
             HCharacter character = characterJob.character();
-            progressManager.hasDiscoveredRecipe(character.getCharacterID(), discoveredRecipe.getId())
+
+            // Process all discovered recipes
+            processMultipleRecipeDiscoveries(character, characterJob, discoveredRecipes);
+        });
+    }
+
+    private void processMultipleRecipeDiscoveries(HCharacter character, CharacterJob characterJob, List<JobRecipe> recipes) {
+        List<JobRecipe> newlyDiscovered = new ArrayList<>();
+        List<JobRecipe> alreadyKnown = new ArrayList<>();
+        List<JobRecipe> levelTooLow = new ArrayList<>();
+
+        // First, categorize all recipes
+        int[] processedCount = {0};
+        for (JobRecipe recipe : recipes) {
+            progressManager.hasDiscoveredRecipe(character.getCharacterID(), recipe.getId())
                 .thenAccept(alreadyDiscovered -> {
                     if (alreadyDiscovered) {
-                        player.sendMessage(Component.text("You already know this recipe!", NamedTextColor.YELLOW));
-                        showRecipeResult(discoveredRecipe);
-                        return;
+                        alreadyKnown.add(recipe);
+                    } else {
+                        JobCharacterBridgeUtil.getJobLevel(characterJob).thenAccept(level -> {
+                            if (level < recipe.getRequiredLevel()) {
+                                levelTooLow.add(recipe);
+                            } else {
+                                newlyDiscovered.add(recipe);
+                            }
+
+                            processedCount[0]++;
+
+                            // Once all recipes are processed, handle the results
+                            if (processedCount[0] == recipes.size()) {
+                                handleDiscoveryResults(character, characterJob, newlyDiscovered, alreadyKnown, levelTooLow);
+                            }
+                        });
                     }
 
-                    JobCharacterBridgeUtil.getJobLevel(characterJob).thenAccept(level -> {
-                        if (level < discoveredRecipe.getRequiredLevel()) {
-                            player.sendMessage(Component.text("Your job level is too low for this recipe! Required: " +
-                                discoveredRecipe.getRequiredLevel(), NamedTextColor.RED));
-                            return;
+                    if (alreadyDiscovered) {
+                        processedCount[0]++;
+
+                        // Once all recipes are processed, handle the results
+                        if (processedCount[0] == recipes.size()) {
+                            handleDiscoveryResults(character, characterJob, newlyDiscovered, alreadyKnown, levelTooLow);
                         }
-
-                        progressManager.discoverRecipe(character.getCharacterID(), discoveredRecipe.getId())
-                            .thenRun(() -> {
-                                player.sendMessage(Component.text("Recipe discovered: " + discoveredRecipe.getId(), NamedTextColor.GREEN));
-                                showRecipeResult(discoveredRecipe);
-
-                                long discoveryXp = discoveredRecipe.getBaseExperience() / 4;
-                                JobCharacterBridgeUtil.grantJobExperience(characterJob, discoveryXp);
-                                player.sendMessage(Component.text("+" + discoveryXp + " job experience!", NamedTextColor.AQUA));
-                            });
-                    });
+                    }
                 });
-        });
+        }
+    }
+
+    private void handleDiscoveryResults(HCharacter character, CharacterJob characterJob,
+                                       List<JobRecipe> newlyDiscovered,
+                                       List<JobRecipe> alreadyKnown,
+                                       List<JobRecipe> levelTooLow) {
+        // Discover all new recipes
+        long totalXp = 0;
+        for (JobRecipe recipe : newlyDiscovered) {
+            progressManager.discoverRecipe(character.getCharacterID(), recipe.getId());
+            long discoveryXp = recipe.getBaseExperience() / 4;
+            totalXp += discoveryXp;
+        }
+
+        // Send feedback to player
+        if (!newlyDiscovered.isEmpty()) {
+            if (newlyDiscovered.size() == 1) {
+                player.sendMessage(Component.text("Recipe discovered: " + newlyDiscovered.get(0).getId(), NamedTextColor.GREEN));
+            } else {
+                player.sendMessage(Component.text("Discovered " + newlyDiscovered.size() + " recipes:", NamedTextColor.GREEN));
+                for (JobRecipe recipe : newlyDiscovered) {
+                    player.sendMessage(Component.text("  - " + recipe.getId(), NamedTextColor.GREEN));
+                }
+            }
+
+            if (totalXp > 0) {
+                JobCharacterBridgeUtil.grantJobExperience(characterJob, totalXp);
+                player.sendMessage(Component.text("+" + totalXp + " job experience!", NamedTextColor.AQUA));
+            }
+
+            // Show the first discovered recipe in the result slot
+            showRecipeResult(newlyDiscovered.get(0));
+        }
+
+        if (!alreadyKnown.isEmpty()) {
+            if (alreadyKnown.size() == 1) {
+                player.sendMessage(Component.text("You already know this recipe!", NamedTextColor.YELLOW));
+            } else {
+                player.sendMessage(Component.text("You already know " + alreadyKnown.size() + " of these recipes.", NamedTextColor.YELLOW));
+            }
+
+            // If no new recipes, show the first known recipe
+            if (newlyDiscovered.isEmpty() && !alreadyKnown.isEmpty()) {
+                showRecipeResult(alreadyKnown.get(0));
+            }
+        }
+
+        if (!levelTooLow.isEmpty()) {
+            if (levelTooLow.size() == 1) {
+                player.sendMessage(Component.text("Your job level is too low for this recipe! Required: " +
+                    levelTooLow.get(0).getRequiredLevel(), NamedTextColor.RED));
+            } else {
+                player.sendMessage(Component.text(levelTooLow.size() + " recipes require a higher job level.", NamedTextColor.RED));
+            }
+        }
     }
 
     private void showRecipeResult(JobRecipe recipe) {

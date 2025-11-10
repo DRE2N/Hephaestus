@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 public class JobRecipe {
 
@@ -17,12 +19,14 @@ public class JobRecipe {
     private final String jobId;
     private final int requiredLevel;
     private final List<RecipeIngredient> ingredients;
-    private final RecipeResult result;
+    private final RecipeResult result; // Fixed result, if not using modifier
+    private final ResultModifier resultModifier; // Dynamic result based on tier
     private final long baseExperience;
     private final int craftingTime; // in ticks
     private final HRarity minRarity;
     private final boolean discoverable;
 
+    // Constructor with fixed result
     public JobRecipe(String id, String jobId, int requiredLevel, List<RecipeIngredient> ingredients,
                      RecipeResult result, long baseExperience, int craftingTime, HRarity minRarity, boolean discoverable) {
         this.id = id;
@@ -30,6 +34,22 @@ public class JobRecipe {
         this.requiredLevel = requiredLevel;
         this.ingredients = new ArrayList<>(ingredients);
         this.result = result;
+        this.resultModifier = null;
+        this.baseExperience = baseExperience;
+        this.craftingTime = craftingTime;
+        this.minRarity = minRarity;
+        this.discoverable = discoverable;
+    }
+
+    // Constructor with dynamic result modifier
+    public JobRecipe(String id, String jobId, int requiredLevel, List<RecipeIngredient> ingredients,
+                     ResultModifier resultModifier, long baseExperience, int craftingTime, HRarity minRarity, boolean discoverable) {
+        this.id = id;
+        this.jobId = jobId;
+        this.requiredLevel = requiredLevel;
+        this.ingredients = new ArrayList<>(ingredients);
+        this.result = null;
+        this.resultModifier = resultModifier;
         this.baseExperience = baseExperience;
         this.craftingTime = craftingTime;
         this.minRarity = minRarity;
@@ -52,8 +72,64 @@ public class JobRecipe {
         return new ArrayList<>(ingredients);
     }
 
+    /**
+     * Check if this recipe uses a dynamic result modifier
+     * @return true if using result modifier
+     */
+    public boolean hasDynamicResult() {
+        return resultModifier != null;
+    }
+
+    /**
+     * Get the fixed result (if not using dynamic results)
+     * @return the recipe result, or null if using dynamic results
+     */
     public RecipeResult getResult() {
         return result;
+    }
+
+    /**
+     * Calculate the result based on the provided ingredients
+     * @param providedIngredients the ingredients being used in the craft
+     * @return the calculated result
+     */
+    public RecipeResult calculateResult(List<ItemStack> providedIngredients) {
+        if (!hasDynamicResult()) {
+            return result; // Return fixed result
+        }
+
+        // Determine the tier from choice ingredients
+        int determinedTier = 0;
+        for (RecipeIngredient ingredient : ingredients) {
+            if (ingredient.isChoice()) {
+                for (ItemStack stack : providedIngredients) {
+                    if (stack == null || stack.getType().isAir()) continue;
+
+                    HItemStack hStack = HItemStack.getFromStack(stack);
+                    if (hStack != null) {
+                        String itemId = hStack.getItem().getKey().toString();
+                        if (ingredient.matches(itemId)) {
+                            int tier = ingredient.getTierForItem(itemId);
+                            determinedTier = Math.max(determinedTier, tier);
+                        }
+                    }
+                }
+            }
+        }
+
+        return resultModifier.calculateResult(determinedTier);
+    }
+
+    /**
+     * Get a display result for GUI purposes (uses tier 0 for dynamic recipes)
+     * @return the display result
+     */
+    public RecipeResult getDisplayResult() {
+        if (!hasDynamicResult()) {
+            return result; // Return fixed result
+        }
+        // For dynamic recipes, show the lowest tier (tier 0) result for display
+        return resultModifier.calculateResult(0);
     }
 
     public long getBaseExperience() {
@@ -90,26 +166,67 @@ public class JobRecipe {
     }
 
     /**
-     * Check if the provided ingredients match this recipe for discovery purposes
-     * Discovery only requires one of the recipe ingredients to be present
+     * Discovery requires exact match of all recipe ingredients (ignoring amounts)
      * @param providedIngredients list of item stacks to check
-     * @return true if at least one ingredient matches for discovery
+     * @return true if the provided ingredients exactly match the recipe's ingredient types
      */
     public boolean matchesIngredientsForDiscovery(List<ItemStack> providedIngredients) {
         if (ingredients.isEmpty()) return false;
 
-        // For discovery, we only need one ingredient to match
-        for (RecipeIngredient recipeIngredient : ingredients) {
-            for (ItemStack provided : providedIngredients) {
-                if (provided == null || provided.getType().isAir()) continue;
+        de.erethon.hephaestus.Hephaestus.log("      Checking discovery match for recipe: " + id);
+        de.erethon.hephaestus.Hephaestus.log("      Recipe has " + ingredients.size() + " ingredient(s)");
 
-                HItemStack hStack = HItemStack.getFromStack(provided);
-                if (hStack != null && hStack.getItem().getKey().toString().equals(recipeIngredient.getItemId())) {
-                    return true; // Found matching ingredient for discovery
-                }
+        // Get unique ingredient types from the recipe (ignoring amounts)
+        Set<String> recipeIngredientTypes = new HashSet<>();
+        for (RecipeIngredient recipeIngredient : ingredients) {
+            if (recipeIngredient.isChoice()) {
+                // For choices, we need to track that there's a choice requirement
+                recipeIngredientTypes.add("choice:" + recipeIngredient.getChoice().getChoiceId());
+            } else {
+                recipeIngredientTypes.add(recipeIngredient.getItemId());
             }
         }
-        return false;
+
+        // Get unique ingredient types from provided items
+        Set<String> providedIngredientTypes = new HashSet<>();
+        for (ItemStack provided : providedIngredients) {
+            if (provided == null || provided.getType().isAir()) continue;
+
+            HItemStack hStack = HItemStack.getFromStack(provided);
+            if (hStack != null) {
+                String itemId = hStack.getItem().getKey().toString();
+                de.erethon.hephaestus.Hephaestus.log("          Provided item: " + itemId);
+
+                // Check if this item matches any recipe ingredient (including choices)
+                boolean matched = false;
+                for (RecipeIngredient recipeIngredient : ingredients) {
+                    if (recipeIngredient.matches(itemId)) {
+                        if (recipeIngredient.isChoice()) {
+                            providedIngredientTypes.add("choice:" + recipeIngredient.getChoice().getChoiceId());
+                        } else {
+                            providedIngredientTypes.add(recipeIngredient.getItemId());
+                        }
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if (!matched) {
+                    de.erethon.hephaestus.Hephaestus.log("          -> Provided item doesn't match any recipe ingredient");
+                    return false; // Provided an item that's not in the recipe
+                }
+            } else {
+                de.erethon.hephaestus.Hephaestus.log("          Skipping vanilla item: " + provided.getType());
+            }
+        }
+
+        // Check if the sets match exactly
+        boolean exactMatch = recipeIngredientTypes.equals(providedIngredientTypes);
+        de.erethon.hephaestus.Hephaestus.log("      Recipe types: " + recipeIngredientTypes);
+        de.erethon.hephaestus.Hephaestus.log("      Provided types: " + providedIngredientTypes);
+        de.erethon.hephaestus.Hephaestus.log("      Exact match: " + exactMatch);
+
+        return exactMatch;
     }
 
     /**
@@ -118,23 +235,38 @@ public class JobRecipe {
      * @return true if ingredients match the recipe requirements exactly
      */
     public boolean matchesIngredients(List<ItemStack> providedIngredients) {
-        Map<String, Integer> requiredCounts = new HashMap<>();
+        // Count required amounts for each ingredient
+        Map<RecipeIngredient, Integer> requiredCounts = new HashMap<>();
         for (RecipeIngredient ingredient : ingredients) {
-            requiredCounts.put(ingredient.getItemId(), ingredient.getAmount());
+            requiredCounts.put(ingredient, ingredient.getAmount());
         }
 
-        Map<String, Integer> providedCounts = new HashMap<>();
+        // Track which ingredients we've matched
+        Map<RecipeIngredient, Integer> matchedCounts = new HashMap<>();
+        for (RecipeIngredient ingredient : ingredients) {
+            matchedCounts.put(ingredient, 0);
+        }
+
+        // Count provided items
         for (ItemStack stack : providedIngredients) {
             if (stack == null || stack.getType().isAir()) continue;
 
             HItemStack hStack = HItemStack.getFromStack(stack);
             if (hStack != null) {
                 String itemId = hStack.getItem().getKey().toString();
-                providedCounts.put(itemId, providedCounts.getOrDefault(itemId, 0) + stack.getAmount());
+
+                // Try to match with each recipe ingredient
+                for (RecipeIngredient ingredient : ingredients) {
+                    if (ingredient.matches(itemId)) {
+                        matchedCounts.put(ingredient, matchedCounts.get(ingredient) + stack.getAmount());
+                        break; // Each stack can only match one ingredient
+                    }
+                }
             }
         }
 
-        return requiredCounts.equals(providedCounts);
+        // Check if all requirements are met exactly
+        return requiredCounts.equals(matchedCounts);
     }
 
     /**
@@ -144,25 +276,34 @@ public class JobRecipe {
      * @return true if ingredients are sufficient for the given multiplier
      */
     public boolean hasEnoughIngredients(List<ItemStack> providedIngredients, int multiplier) {
-        Map<String, Integer> requiredCounts = new HashMap<>();
+        // Track which ingredients we've matched
+        Map<RecipeIngredient, Integer> matchedCounts = new HashMap<>();
         for (RecipeIngredient ingredient : ingredients) {
-            requiredCounts.put(ingredient.getItemId(), ingredient.getAmount() * multiplier);
+            matchedCounts.put(ingredient, 0);
         }
 
-        Map<String, Integer> providedCounts = new HashMap<>();
+        // Count provided items
         for (ItemStack stack : providedIngredients) {
             if (stack == null || stack.getType().isAir()) continue;
 
             HItemStack hStack = HItemStack.getFromStack(stack);
             if (hStack != null) {
                 String itemId = hStack.getItem().getKey().toString();
-                providedCounts.put(itemId, providedCounts.getOrDefault(itemId, 0) + stack.getAmount());
+
+                // Try to match with each recipe ingredient
+                for (RecipeIngredient ingredient : ingredients) {
+                    if (ingredient.matches(itemId)) {
+                        matchedCounts.put(ingredient, matchedCounts.get(ingredient) + stack.getAmount());
+                        break;
+                    }
+                }
             }
         }
 
         // Check if we have at least the required amount of each ingredient
-        for (Map.Entry<String, Integer> required : requiredCounts.entrySet()) {
-            if (providedCounts.getOrDefault(required.getKey(), 0) < required.getValue()) {
+        for (RecipeIngredient ingredient : ingredients) {
+            int required = ingredient.getAmount() * multiplier;
+            if (matchedCounts.getOrDefault(ingredient, 0) < required) {
                 return false;
             }
         }
@@ -175,20 +316,33 @@ public class JobRecipe {
      * @return maximum craft count, 0 if recipe cannot be crafted
      */
     public int getMaxCraftableCount(List<ItemStack> providedIngredients) {
-        Map<String, Integer> providedCounts = new HashMap<>();
+        // Track which ingredients we've matched
+        Map<RecipeIngredient, Integer> matchedCounts = new HashMap<>();
+        for (RecipeIngredient ingredient : ingredients) {
+            matchedCounts.put(ingredient, 0);
+        }
+
+        // Count provided items
         for (ItemStack stack : providedIngredients) {
             if (stack == null || stack.getType().isAir()) continue;
 
             HItemStack hStack = HItemStack.getFromStack(stack);
             if (hStack != null) {
                 String itemId = hStack.getItem().getKey().toString();
-                providedCounts.put(itemId, providedCounts.getOrDefault(itemId, 0) + stack.getAmount());
+
+                // Try to match with each recipe ingredient
+                for (RecipeIngredient ingredient : ingredients) {
+                    if (ingredient.matches(itemId)) {
+                        matchedCounts.put(ingredient, matchedCounts.get(ingredient) + stack.getAmount());
+                        break;
+                    }
+                }
             }
         }
 
         int maxCraftable = Integer.MAX_VALUE;
         for (RecipeIngredient ingredient : ingredients) {
-            int available = providedCounts.getOrDefault(ingredient.getItemId(), 0);
+            int available = matchedCounts.getOrDefault(ingredient, 0);
             int possibleCrafts = available / ingredient.getAmount();
             maxCraftable = Math.min(maxCraftable, possibleCrafts);
         }
@@ -211,8 +365,16 @@ public class JobRecipe {
             ingredients.get(i).serialize(ingredientSection);
         }
 
-        ConfigurationSection resultSection = section.createSection("result");
-        result.serialize(resultSection);
+        // Serialize result or result modifier
+        if (hasDynamicResult()) {
+            section.set("resultType", "dynamic");
+            ConfigurationSection modifierSection = section.createSection("resultModifier");
+            resultModifier.serialize(modifierSection);
+        } else {
+            section.set("resultType", "fixed");
+            ConfigurationSection resultSection = section.createSection("result");
+            result.serialize(resultSection);
+        }
     }
 
     public static JobRecipe deserialize(ConfigurationSection section) {
@@ -235,6 +397,17 @@ public class JobRecipe {
             }
         }
 
+        // Deserialize result or result modifier
+        String resultType = section.getString("resultType", "fixed");
+        if ("dynamic".equals(resultType)) {
+            ConfigurationSection modifierSection = section.getConfigurationSection("resultModifier");
+            if (modifierSection != null) {
+                ResultModifier modifier = ResultModifier.deserialize(modifierSection);
+                return new JobRecipe(id, jobId, requiredLevel, ingredients, modifier, baseExperience, craftingTime, minRarity, discoverable);
+            }
+        }
+
+        // Default to fixed result
         RecipeResult result = null;
         ConfigurationSection resultSection = section.getConfigurationSection("result");
         if (resultSection != null) {

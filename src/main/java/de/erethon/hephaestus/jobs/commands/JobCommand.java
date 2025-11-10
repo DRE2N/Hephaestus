@@ -1,11 +1,16 @@
 package de.erethon.hephaestus.jobs.commands;
 
+import de.erethon.hecate.data.HCharacter;
 import de.erethon.hephaestus.jobs.HJob;
 import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
 import de.erethon.hephaestus.jobs.JobManager;
 import de.erethon.hephaestus.Hephaestus;
+import de.erethon.hephaestus.jobs.crafting.JobRecipe;
+import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
+import de.erethon.hephaestus.jobs.crafting.RecipeManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -65,6 +70,17 @@ public class JobCommand extends Command implements TabCompleter {
                     player.sendMessage(Component.text("You don't have permission to reload jobs.", NamedTextColor.RED));
                 }
             }
+            case "unlock" -> {
+                if (player.hasPermission("hephaestus.job.admin")) {
+                    if (args.length < 3) {
+                        player.sendMessage(Component.text("Usage: /job unlock <player> <recipeId>", NamedTextColor.RED));
+                        return true;
+                    }
+                    unlockRecipe(player, args[1], args[2]);
+                } else {
+                    player.sendMessage(Component.text("You don't have permission to unlock recipes.", NamedTextColor.RED));
+                }
+            }
             default -> showHelp(player);
         }
         return true;
@@ -79,6 +95,9 @@ public class JobCommand extends Command implements TabCompleter {
         player.sendMessage(Component.translatable("hephaestus.job.command.help.leave", NamedTextColor.YELLOW));
         if (player.hasPermission("hephaestus.job.reload")) {
             player.sendMessage(Component.translatable("hephaestus.job.command.help.reload", NamedTextColor.YELLOW));
+        }
+        if (player.hasPermission("hephaestus.job.admin")) {
+            player.sendMessage(Component.translatable("hephaestus.job.command.help.unlock", NamedTextColor.YELLOW));
         }
     }
 
@@ -180,23 +199,70 @@ public class JobCommand extends Command implements TabCompleter {
         }
     }
 
+    private void unlockRecipe(Player admin, String targetPlayerName, String recipeId) {
+        Player targetPlayer = Bukkit.getPlayer(targetPlayerName);
+        if (targetPlayer == null) {
+            admin.sendMessage(Component.text("Player '" + targetPlayerName + "' is not online.", NamedTextColor.RED));
+            return;
+        }
+
+        RecipeManager recipeManager = Hephaestus.INSTANCE.getRecipeManager();
+        JobRecipe recipe = recipeManager.getRecipe(recipeId);
+        if (recipe == null) {
+            admin.sendMessage(Component.text("Recipe '" + recipeId + "' does not exist.", NamedTextColor.RED));
+            return;
+        }
+
+        HCharacter character = JobCharacterBridgeUtil.getCharacter(targetPlayer);
+        if (character == null) {
+            admin.sendMessage(Component.text("Player '" + targetPlayerName + "' has no active character.", NamedTextColor.RED));
+            return;
+        }
+
+        PlayerCraftingProgress craftingProgress = Hephaestus.INSTANCE.getPlayerCraftingProgress();
+        craftingProgress.discoverRecipe(character.getCharacterID(), recipeId).thenAccept(v -> {
+            admin.sendMessage(Component.text("Successfully unlocked recipe '" + recipeId + "' for player '" + targetPlayerName + "'.", NamedTextColor.GREEN));
+            targetPlayer.sendMessage(Component.text("You have discovered a new recipe: " + recipeId + "!", NamedTextColor.GOLD));
+        }).exceptionally(ex -> {
+            admin.sendMessage(Component.text("Failed to unlock recipe: " + ex.getMessage(), NamedTextColor.RED));
+            return null;
+        });
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
 
         if (args.length == 1) {
-            List<String> commands = List.of("list", "info", "select", "current", "leave");
+            List<String> commands = new ArrayList<>(List.of("list", "info", "select", "current", "leave"));
             if (sender.hasPermission("hephaestus.job.reload")) {
-                commands = new ArrayList<>(commands);
                 commands.add("reload");
+            }
+            if (sender.hasPermission("hephaestus.job.admin")) {
+                commands.add("unlock");
             }
             completions.addAll(commands.stream()
                     .filter(cmd -> cmd.toLowerCase().startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList()));
-        } else if (args.length == 2 && (args[0].equalsIgnoreCase("info") || args[0].equalsIgnoreCase("select"))) {
-            completions.addAll(jobManager.getAllJobs().stream()
-                    .map(HJob::getId)
-                    .filter(id -> id.toLowerCase().startsWith(args[1].toLowerCase()))
+        } else if (args.length == 3) {
+            if (args[1].equalsIgnoreCase("info") || args[1].equalsIgnoreCase("select")) {
+                completions.addAll(jobManager.getAllJobs().stream()
+                        .map(HJob::getId)
+                        .filter(id -> id.toLowerCase().startsWith(args[2].toLowerCase()))
+                        .collect(Collectors.toList()));
+            } else if (args[1].equalsIgnoreCase("unlock")) {
+                // Tab complete online player names
+                completions.addAll(Bukkit.getOnlinePlayers().stream()
+                        .map(Player::getName)
+                        .filter(name -> name.toLowerCase().startsWith(args[2].toLowerCase()))
+                        .collect(Collectors.toList()));
+            }
+        } else if (args.length == 4 && args[1].equalsIgnoreCase("unlock")) {
+            // Tab complete recipe IDs
+            var recipeManager = Hephaestus.INSTANCE.getRecipeManager();
+            completions.addAll(recipeManager.getAllRecipes().stream()
+                    .map(JobRecipe::getId)
+                    .filter(id -> id.toLowerCase().startsWith(args[3].toLowerCase()))
                     .collect(Collectors.toList()));
         }
 

@@ -23,10 +23,6 @@ public class JobManager {
     }
 
     private void loadJobsFromConfig() {
-        if (!configFile.exists()) {
-            createDefaultConfig();
-        }
-
         YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
         ConfigurationSection jobsSection = config.getConfigurationSection("jobs");
 
@@ -86,52 +82,6 @@ public class JobManager {
             default -> {
                 return java.util.Locale.US;
             }
-        }
-    }
-
-    // Some defaults so we aren't as clueless as with JXL
-    private void createDefaultConfig() {
-        YamlConfiguration config = new YamlConfiguration();
-        ConfigurationSection jobsSection = config.createSection("jobs");
-
-        ConfigurationSection minerSection = jobsSection.createSection("miner");
-        minerSection.set("id", "miner");
-        minerSection.set("description", "Extract valuable resources from the earth");
-        minerSection.set("maxLevel", 100);
-
-        ConfigurationSection minerTranslations = minerSection.createSection("translations");
-        minerTranslations.set("name.en", "Miner");
-        minerTranslations.set("name.de", "Bergarbeiter");
-        minerTranslations.set("description.en", "Extract valuable resources from the earth");
-        minerTranslations.set("description.de", "Wertvolle Ressourcen aus der Erde abbauen");
-
-        ConfigurationSection smithSection = jobsSection.createSection("smith");
-        smithSection.set("id", "smith");
-        smithSection.set("description", "Forge weapons and tools from raw materials");
-        smithSection.set("maxLevel", 100);
-
-        ConfigurationSection smithTranslations = smithSection.createSection("translations");
-        smithTranslations.set("name.en", "Smith");
-        smithTranslations.set("name.de", "Schmied");
-        smithTranslations.set("description.en", "Forge weapons and tools from raw materials");
-        smithTranslations.set("description.de", "Waffen und Werkzeuge aus Rohstoffen schmieden");
-
-        ConfigurationSection alchemistSection = jobsSection.createSection("alchemist");
-        alchemistSection.set("id", "alchemist");
-        alchemistSection.set("description", "Brew potions and create magical items");
-        alchemistSection.set("maxLevel", 100);
-
-        ConfigurationSection alchemistTranslations = alchemistSection.createSection("translations");
-        alchemistTranslations.set("name.en", "Alchemist");
-        alchemistTranslations.set("name.de", "Alchemist");
-        alchemistTranslations.set("description.en", "Brew potions and create magical items");
-        alchemistTranslations.set("description.de", "Tränke brauen und magische Gegenstände herstellen");
-
-        try {
-            config.save(configFile);
-            Hephaestus.log("Created default jobs configuration at: " + configFile.getPath());
-        } catch (IOException e) {
-            Hephaestus.log("Failed to create default jobs configuration: " + e.getMessage());
         }
     }
 
