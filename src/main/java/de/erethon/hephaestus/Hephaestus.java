@@ -2,6 +2,9 @@ package de.erethon.hephaestus;
 
 import de.erethon.bedrock.database.BedrockDBConnection;
 import de.erethon.hecate.Hecate;
+import de.erethon.hephaestus.auctionhouse.AuctionHouseDatabaseManager;
+import de.erethon.hephaestus.auctionhouse.AuctionHouseManager;
+import de.erethon.hephaestus.auctionhouse.commands.AuctionHouseCommand;
 import de.erethon.hephaestus.blocks.HBlockLibrary;
 import de.erethon.hephaestus.crafting.VanillaRecipeManager;
 import de.erethon.hephaestus.items.HItem;
@@ -41,6 +44,8 @@ public final class Hephaestus extends JavaPlugin {
     private HEquipmentManager equipmentManager;
     private JobManager jobManager;
     private JobDatabaseManager jobDatabaseManager;
+    private AuctionHouseDatabaseManager auctionHouseDatabaseManager;
+    private AuctionHouseManager auctionHouseManager;
     private RecipeManager recipeManager;
     private PlayerCraftingProgress playerCraftingProgress;
     private TranslationManager translationManager;
@@ -86,6 +91,9 @@ public final class Hephaestus extends JavaPlugin {
         // Initialize database and job system
         initializeJobSystem();
 
+        // Initialize auction house system
+        initializeAuctionHouse();
+
         HListener itemListener = new HListener(this);
         EquipmentListener equipmentListener = new EquipmentListener();
         Bukkit.getPluginManager().registerEvents(itemListener, this);
@@ -117,6 +125,9 @@ public final class Hephaestus extends JavaPlugin {
         itemLibrary.save();
         if (jobDatabaseManager != null) {
             jobDatabaseManager.close();
+        }
+        if (auctionHouseDatabaseManager != null) {
+            auctionHouseDatabaseManager.close();
         }
     }
 
@@ -194,12 +205,48 @@ public final class Hephaestus extends JavaPlugin {
         }
     }
 
+    private void initializeAuctionHouse() {
+        try {
+            YamlConfiguration env = YamlConfiguration.loadConfiguration(new File(Bukkit.getWorldContainer(), "environment.yml"));
+            try {
+                BedrockDBConnection connection = new BedrockDBConnection(env.getString("dbUrl"),
+                        env.getString("dbUser"),
+                        env.getString("dbPassword"),
+                        "org.postgresql.ds.PGSimpleDataSource");
+                auctionHouseDatabaseManager = new AuctionHouseDatabaseManager(connection);
+            } catch (Exception e) {
+                getLogger().severe("Failed to connect to database for auction house: " + e.getMessage());
+                e.printStackTrace();
+                return;
+            }
+
+            auctionHouseManager = new AuctionHouseManager(this, auctionHouseDatabaseManager);
+
+            // Register auction house command
+            AuctionHouseCommand ahCommand = new AuctionHouseCommand(this, auctionHouseManager);
+            Bukkit.getCommandMap().register("hephaestus", ahCommand);
+
+            getLogger().info("Auction house system initialized successfully");
+        } catch (Exception e) {
+            getLogger().severe("Failed to initialize auction house: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     public JobManager getJobManager() {
         return jobManager;
     }
 
     public JobDatabaseManager getJobDatabaseManager() {
         return jobDatabaseManager;
+    }
+
+    public AuctionHouseDatabaseManager getAuctionHouseDatabaseManager() {
+        return auctionHouseDatabaseManager;
+    }
+
+    public AuctionHouseManager getAuctionHouseManager() {
+        return auctionHouseManager;
     }
 
     public RecipeManager getRecipeManager() {
