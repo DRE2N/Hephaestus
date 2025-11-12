@@ -81,6 +81,9 @@ public class JobCommand extends Command implements TabCompleter {
                     player.sendMessage(Component.text("You don't have permission to unlock recipes.", NamedTextColor.RED));
                 }
             }
+            case "test" -> {
+                player.getInventory().getItem(0).setAmount(6969);
+            }
             default -> showHelp(player);
         }
         return true;

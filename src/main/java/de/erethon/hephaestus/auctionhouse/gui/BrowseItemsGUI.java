@@ -3,8 +3,10 @@
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.auctionhouse.AuctionHouseManager;
 import de.erethon.hephaestus.items.HItem;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.object.ObjectContents;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -53,7 +55,7 @@ public class BrowseItemsGUI implements InventoryHolder, Listener {
         this.player = player;
         this.allowCollection = allowCollection;
         this.inventory = Bukkit.createInventory(this, 54,
-            Component.text("Browse Items", NamedTextColor.GOLD));
+            Component.text("Browse Items ", NamedTextColor.GOLD).append(Component.object(ObjectContents.sprite(Key.key("item/ender_eye")))));
 
         loadAvailableItems();
         Bukkit.getPluginManager().registerEvents(this, plugin);

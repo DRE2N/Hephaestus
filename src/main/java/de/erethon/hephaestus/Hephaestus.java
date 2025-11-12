@@ -20,6 +20,9 @@ import de.erethon.hephaestus.jobs.crafting.commands.CraftingCommand;
 import de.erethon.hephaestus.listeners.CraftingListener;
 import de.erethon.hephaestus.listeners.EquipmentListener;
 import de.erethon.hephaestus.listeners.HListener;
+import de.erethon.hephaestus.shops.ShopDatabaseManager;
+import de.erethon.hephaestus.shops.ShopManager;
+import de.erethon.hephaestus.shops.commands.ShopCommand;
 import de.erethon.hephaestus.translations.TranslationManager;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -46,6 +49,8 @@ public final class Hephaestus extends JavaPlugin {
     private JobDatabaseManager jobDatabaseManager;
     private AuctionHouseDatabaseManager auctionHouseDatabaseManager;
     private AuctionHouseManager auctionHouseManager;
+    private ShopDatabaseManager shopDatabaseManager;
+    private ShopManager shopManager;
     private RecipeManager recipeManager;
     private PlayerCraftingProgress playerCraftingProgress;
     private TranslationManager translationManager;
@@ -104,6 +109,9 @@ public final class Hephaestus extends JavaPlugin {
         // Always check for and register missing vanilla items
         generateDefaultItems();
 
+        // Initialize shop system AFTER items are loaded
+        initializeShops();
+
         // Initialize vanilla crafting system
         File vanillaRecipesFile = new File(getDataFolder(), "vanilla_recipes.yml");
         vanillaRecipeManager = new VanillaRecipeManager(this, vanillaRecipesFile);
@@ -128,6 +136,9 @@ public final class Hephaestus extends JavaPlugin {
         }
         if (auctionHouseDatabaseManager != null) {
             auctionHouseDatabaseManager.close();
+        }
+        if (shopDatabaseManager != null) {
+            shopDatabaseManager.close();
         }
     }
 
@@ -233,6 +244,35 @@ public final class Hephaestus extends JavaPlugin {
         }
     }
 
+    private void initializeShops() {
+        try {
+            YamlConfiguration env = YamlConfiguration.loadConfiguration(new File(Bukkit.getWorldContainer(), "environment.yml"));
+            try {
+                BedrockDBConnection connection = new BedrockDBConnection(env.getString("dbUrl"),
+                        env.getString("dbUser"),
+                        env.getString("dbPassword"),
+                        "org.postgresql.ds.PGSimpleDataSource");
+                shopDatabaseManager = new ShopDatabaseManager(connection);
+            } catch (Exception e) {
+                getLogger().severe("Failed to connect to database for shops: " + e.getMessage());
+                e.printStackTrace();
+                return;
+            }
+
+            File shopsDirectory = new File(getDataFolder(), "shops");
+            shopManager = new ShopManager(this, shopDatabaseManager, shopsDirectory);
+
+            // Register shop command
+            ShopCommand shopCommand = new ShopCommand("shop");
+            Bukkit.getCommandMap().register("hephaestus", shopCommand);
+
+            getLogger().info("Shop system initialized successfully");
+        } catch (Exception e) {
+            getLogger().severe("Failed to initialize shop system: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     public JobManager getJobManager() {
         return jobManager;
     }
@@ -247,6 +287,14 @@ public final class Hephaestus extends JavaPlugin {
 
     public AuctionHouseManager getAuctionHouseManager() {
         return auctionHouseManager;
+    }
+
+    public ShopDatabaseManager getShopDatabaseManager() {
+        return shopDatabaseManager;
+    }
+
+    public ShopManager getShopManager() {
+        return shopManager;
     }
 
     public RecipeManager getRecipeManager() {
