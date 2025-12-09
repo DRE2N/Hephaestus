@@ -59,7 +59,7 @@ public class HRandom {
      * Select a random double value from weighted ranges with configurable curve bias.
      *
      * @param rangeWeights Map of (min, max) pairs to their weights
-     * @param biasPower   Power to apply to the random value (1.0 = uniform, >1.0 = bias toward min, <1.0 = bias toward max)
+     * @param biasPower   Power to apply to the random value
      * @return A random double value from the weighted ranges
      */
     public static double selectWeightedCurveValue(Map<double[], Integer> rangeWeights, double biasPower) {

@@ -2,6 +2,7 @@ package de.erethon.hephaestus.jobs.crafting.gui;
 
 import de.erethon.hecate.data.HCharacter;
 import de.erethon.hephaestus.Hephaestus;
+import de.erethon.hephaestus.events.HJobCraftItemEvent;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
@@ -898,6 +899,8 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
                         Bukkit.getScheduler().runTask(plugin, () -> {
                             player.closeInventory();
                             new CraftingStationGUI(plugin, player).open();
+                            // Call event
+                            new HJobCraftItemEvent(player, recipe, result.getItemId(), completedQuantity).callEvent();
                         });
                     });
         });
