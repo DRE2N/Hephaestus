@@ -26,7 +26,7 @@ import net.minecraft.core.component.TypedDataComponent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.RegistryOps;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.datafix.fixes.References;
@@ -63,7 +63,7 @@ public class HItem {
 
     // Basics
     private final File file;
-    private ResourceLocation key;
+    private Identifier key;
     private Item baseItem;
     private DataComponentPatch patch;
     private BlockData blockData = null;
@@ -71,7 +71,7 @@ public class HItem {
     private final Set<String> allowedUpgrades = new HashSet<>();
     private final Set<String> tags = new HashSet<>();
     // Model
-    private ResourceLocation itemModel = null;
+    private Identifier itemModel = null;
     // Orb system
     private final List<OrbColor> socketColors = new ArrayList<>();
     private OrbColor orbColor = null; // if this item is an orb itself
@@ -103,11 +103,11 @@ public class HItem {
         load();
     }
 
-    public HItem(ResourceLocation key, File file) {
+    public HItem(Identifier key, File file) {
         this.file = file;
     }
 
-    public HItem(ResourceLocation key, Item baseItem, DataComponentPatch patch) {
+    public HItem(Identifier key, Item baseItem, DataComponentPatch patch) {
         this.key = key;
         this.baseItem = baseItem;
         this.patch = sanitizePatch(patch == null ? DataComponentPatch.EMPTY : patch);
@@ -284,15 +284,15 @@ public class HItem {
 
     /**
      * Gets the NMS key of this item, which is a unique identifier in the format namespace:path.
-     * @return the ResourceLocation key of this item
+     * @return the Identifier key of this item
      */
-    public ResourceLocation getKey() {
+    public Identifier getKey() {
         return key;
     }
 
     /**
      * Gets the Bukkit NamespacedKey of this item, which is used for Bukkit APIs.
-     * This is a conversion from the NMS ResourceLocation to the Bukkit format.
+     * This is a conversion from the NMS Identifier to the Bukkit format.
      * @return the NamespacedKey of this item
      */
     public NamespacedKey getBukkitKey() {
@@ -436,7 +436,7 @@ public class HItem {
         return tags;
     }
 
-    public ResourceLocation getItemModel() {
+    public Identifier getItemModel() {
         return itemModel;
     }
 
@@ -459,14 +459,14 @@ public class HItem {
 
     private void load() {
         config = YamlConfiguration.loadConfiguration(file);
-        key = ResourceLocation.parse(config.getString("key", "hephaestus:default"));
-        if (BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone"))).isPresent()) {
-            baseItem = BuiltInRegistries.ITEM.get(ResourceLocation.parse(config.getString("baseItem", "minecraft:stone"))).get().value();
+        key = Identifier.parse(config.getString("key", "hephaestus:default"));
+        if (BuiltInRegistries.ITEM.get(Identifier.parse(config.getString("baseItem", "minecraft:stone"))).isPresent()) {
+            baseItem = BuiltInRegistries.ITEM.get(Identifier.parse(config.getString("baseItem", "minecraft:stone"))).get().value();
         } else {
             throw new RuntimeException("Base item not found: " + config.getString("baseItem"));
         }
         if (config.contains("model") && config.getString("model", null) != null) {
-            itemModel = ResourceLocation.parse(config.getString("model"));
+            itemModel = Identifier.parse(config.getString("model"));
         }
         if (config.contains("name")) {
             ConfigurationSection nameSection = config.getConfigurationSection("name");
@@ -532,7 +532,7 @@ public class HItem {
             breakSpeedModifier = (float) config.getDouble("breakSpeedModifier", 1.0f);
         }
         if (config.contains("placementSound")) {
-            placementSound = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.parse(config.getString("placementSound", "minecraft:block.stone.place"))).get().value();
+            placementSound = BuiltInRegistries.SOUND_EVENT.get(Identifier.parse(config.getString("placementSound", "minecraft:block.stone.place"))).get().value();
         }
         if (config.contains("blockDrops")) {
             ConfigurationSection dropsSection = config.getConfigurationSection("blockDrops");

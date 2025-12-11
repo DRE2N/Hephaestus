@@ -16,7 +16,7 @@ plugins {
 }
 
 group = "de.erethon.hephaestus"
-version = "1.0.4-SNAPSHOT"
+version = "1.0.5-SNAPSHOT"
 description = "Items"
 
 java {
@@ -25,7 +25,7 @@ java {
     withJavadocJar()
 }
 
-val papyrusVersion = "1.21.10-R0.1-SNAPSHOT"
+val papyrusVersion = "1.21.11-R0.1-SNAPSHOT"
 
 dependencies {
     paperweight.devBundle("de.erethon.papyrus", papyrusVersion) { isChanging = true}

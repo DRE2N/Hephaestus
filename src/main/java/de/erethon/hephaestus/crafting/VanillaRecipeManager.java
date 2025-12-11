@@ -186,7 +186,7 @@ public class VanillaRecipeManager {
         HItem hItem = Hephaestus.getItem(itemId);
         if (hItem != null) {
             net.minecraft.world.item.Item nmsItem = hItem.getBaseItem();
-            net.minecraft.resources.ResourceLocation itemKey = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(nmsItem);
+            net.minecraft.resources.Identifier itemKey = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(nmsItem);
 
             try {
                 // Convert minecraft:stone -> STONE

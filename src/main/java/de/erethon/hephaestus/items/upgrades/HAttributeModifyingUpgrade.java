@@ -61,7 +61,7 @@ public class HAttributeModifyingUpgrade extends HItemUpgrade {
                 Hephaestus.INSTANCE.getLogger().warning("Attribute key unwrap returned null");
                 continue;
             }
-            String keyString = key.location().toString();
+            String keyString = key.identifier().toString();
             Hephaestus.INSTANCE.getLogger().info("Rolling attribute " + keyString + " = " + value);
             valueTag.putDouble(keyString, value);
         }

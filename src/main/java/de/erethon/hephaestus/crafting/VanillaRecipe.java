@@ -3,7 +3,7 @@ package de.erethon.hephaestus.crafting;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
@@ -144,7 +144,7 @@ public class VanillaRecipe {
 
         // Fall back to vanilla material
         try {
-            ResourceLocation location = ResourceLocation.parse(itemId);
+            Identifier location = Identifier.parse(itemId);
             if (location.getNamespace().equals("minecraft")) {
                 Material material = Material.getMaterial(location.getPath().toUpperCase());
                 if (material != null) {

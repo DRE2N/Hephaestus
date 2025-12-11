@@ -6,7 +6,7 @@ import de.erethon.hephaestus.utils.HLibraryAction;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 
@@ -20,7 +20,7 @@ public class HItemLibrary {
 
     private final File itemDataDirectory;
     private final File upgradeDataDirectory;
-    private final HashMap<ResourceLocation, HItem> items = new HashMap<>();
+    private final HashMap<Identifier, HItem> items = new HashMap<>();
     private final HashMap<String, HItemUpgrade> upgrades = new HashMap<>();
 
     public HItemLibrary(File itemFile, File upgradeFile) {
@@ -31,15 +31,15 @@ public class HItemLibrary {
     // Items
 
     public HItem get(NamespacedKey key) {
-        return items.get(ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
+        return items.get(Identifier.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
     }
 
-    public HItem get(ResourceLocation key) {
+    public HItem get(Identifier key) {
         return items.get(key);
     }
 
     public HItem get(String key) {
-        return items.get(ResourceLocation.parse(key));
+        return items.get(Identifier.parse(key));
     }
 
     public HItemStack get(net.minecraft.world.item.ItemStack stack) {
@@ -54,7 +54,7 @@ public class HItemLibrary {
         if (id.isEmpty()) {
             return null;
         }
-        HItem item = items.get(ResourceLocation.parse(id.get()));
+        HItem item = items.get(Identifier.parse(id.get()));
         return new HItemStack(item, stack);
     }
 
@@ -63,14 +63,14 @@ public class HItemLibrary {
     }
 
     public void runIfPresent(NamespacedKey key, HLibraryAction action) {
-        ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey());
+        Identifier loc = Identifier.fromNamespaceAndPath(key.getNamespace(), key.getKey());
         HItem item = items.get(loc);
         if (item != null) {
             action.execute(item);
         }
     }
 
-    public void runIfPresent(ResourceLocation key, HLibraryAction action) {
+    public void runIfPresent(Identifier key, HLibraryAction action) {
         HItem item = items.get(key);
         if (item != null) {
             action.execute(item);
@@ -78,14 +78,14 @@ public class HItemLibrary {
     }
 
     public boolean has(NamespacedKey key) {
-        return items.containsKey(ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
+        return items.containsKey(Identifier.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
     }
 
-    public boolean has(ResourceLocation key) {
+    public boolean has(Identifier key) {
         return items.containsKey(key);
     }
 
-    public List<ResourceLocation> getKeys() {
+    public List<Identifier> getKeys() {
         return new ArrayList<>(items.keySet());
     }
 
@@ -107,10 +107,10 @@ public class HItemLibrary {
 
     public HItem register(ItemStack item, NamespacedKey key){
         net.minecraft.world.item.ItemStack nmsItem = org.bukkit.craftbukkit.inventory.CraftItemStack.asNMSCopy(item);
-        return register(nmsItem, ResourceLocation.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
+        return register(nmsItem, Identifier.fromNamespaceAndPath(key.getNamespace(), key.getKey()));
     }
 
-    public HItem register(net.minecraft.world.item.ItemStack item, ResourceLocation key) {
+    public HItem register(net.minecraft.world.item.ItemStack item, Identifier key) {
         HItem hItem = new HItem(key, item.getItem(), sanitizePatch(item.getComponentsPatch()));
         items.put(key, hItem);
         return hItem;

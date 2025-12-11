@@ -25,7 +25,7 @@ import de.erethon.hephaestus.shops.ShopManager;
 import de.erethon.hephaestus.shops.commands.ShopCommand;
 import de.erethon.hephaestus.translations.TranslationManager;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -84,7 +84,7 @@ public final class Hephaestus extends JavaPlugin {
     }
 
     public static HItem registerNewFromBukkit(String key, org.bukkit.inventory.ItemStack stack) {
-        return INSTANCE.getLibrary().register(ItemStack.fromBukkitCopy(stack), ResourceLocation.parse(key));
+        return INSTANCE.getLibrary().register(ItemStack.fromBukkitCopy(stack), Identifier.parse(key));
     }
 
     @Override
@@ -200,7 +200,7 @@ public final class Hephaestus extends JavaPlugin {
         int totalCount = 0;
         for (Item item : BuiltInRegistries.ITEM.stream().toList()) {
             totalCount++;
-            ResourceLocation itemKey = BuiltInRegistries.ITEM.getKey(item);
+            Identifier itemKey = BuiltInRegistries.ITEM.getKey(item);
             // Only register items that don't already exist
             if (itemLibrary.get(itemKey) == null) {
                 itemLibrary.register(new ItemStack(item), itemKey);

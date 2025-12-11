@@ -18,7 +18,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
@@ -388,7 +388,7 @@ public class HItemStack {
                         for (var entry : def.entrySet()) {
                             var holderKeyOpt = entry.getKey().unwrapKey();
                             if (holderKeyOpt.isEmpty()) continue;
-                            String keyStr = holderKeyOpt.get().location().toString();
+                            String keyStr = holderKeyOpt.get().identifier().toString();
                             // Determine level-relevant modifiers (exact or nearest lower) like roll() does
                             var perLevel = entry.getValue();
                             Map<double[], Integer> levelModifiers = perLevel.get(itemLevel);
@@ -585,7 +585,7 @@ public class HItemStack {
             for (String k : u.getValues().keySet()) {
                 double val = u.getValues().getDouble(k).get();
                 try {
-                    ResourceLocation rl = ResourceLocation.parse(k);
+                    Identifier rl = Identifier.parse(k);
                     var holderOpt = BuiltInRegistries.ATTRIBUTE.get(rl);
                     if (holderOpt.isEmpty()) continue; // unknown attribute
                     String pathPart = u.getId() + "-" + rl.getNamespace() + "_" + rl.getPath() + "-orb";
@@ -593,7 +593,7 @@ public class HItemStack {
                         pathPart += "-s" + u.getSocketIndex();
                     }
                     pathPart += "-" + uniqueCounter++;
-                    ResourceLocation modifierId = ResourceLocation.tryParse("hephaestus:" + pathPart.toLowerCase(Locale.ROOT));
+                    Identifier modifierId = Identifier.tryParse("hephaestus:" + pathPart.toLowerCase(Locale.ROOT));
                     if (modifierId == null) {
                         Hephaestus.INSTANCE.getLogger().warning("Invalid generated modifier id path for upgrade " + u.getId() + ": " + pathPart);
                         continue;
@@ -608,15 +608,15 @@ public class HItemStack {
     }
 
     public static HItemStack getFromStack(ItemStack stack) {
-        ResourceLocation key;
-        ResourceLocation vanillaKey = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        Identifier key;
+        Identifier vanillaKey = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (!stack.has(DataComponents.CUSTOM_DATA)) {
             key = vanillaKey;
         } else {
             CompoundTag tag = stack.get(DataComponents.CUSTOM_DATA).getUnsafe(); // Avoid copy
             Optional<String> optId = tag.getString("hephaestus-id");
             // Fallback to vanilla key if no Hephaestus ID is present
-            key = optId.map(ResourceLocation::parse).orElse(vanillaKey);
+            key = optId.map(Identifier::parse).orElse(vanillaKey);
         }
         HItem item = Hephaestus.INSTANCE.getLibrary().get(key);
         if (item == null) { // If deleted, return vanilla item
