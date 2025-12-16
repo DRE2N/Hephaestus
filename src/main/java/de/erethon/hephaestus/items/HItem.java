@@ -157,7 +157,7 @@ public class HItem {
      * @return a new HItemStack with random properties based on this item
      */
     public HItemStack rollRandomStack() {
-        return rollRandomStack(0);
+        return rollRandomStack(0, 1);
     }
 
     /**
@@ -165,13 +165,14 @@ public class HItem {
      * The level is determined by the level weights, and the rarity is determined by the rarity weights for that level.
      * The socket pattern is also applied based on the rarity and level.
      * @param minLevel the minimum level to roll, used to ensure the item is at least this level
+     * @param maxLevel the maximum level to roll, used to ensure the item is at most this level
      * @return a new HItemStack with random properties based on this item
      */
-    public HItemStack rollRandomStack(int minLevel) {
+    public HItemStack rollRandomStack(int minLevel, int maxLevel) {
         HItemStack hStack = new HItemStack(this); // visuals now auto-init
         int level = 0;
         if (levelWeights != null && !levelWeights.isEmpty()) {
-            Object levelObj = HRandom.selectWeightedRandomValue(levelWeights, minLevel);
+            Object levelObj = HRandom.selectWeightedRandomValue(levelWeights, minLevel, maxLevel);
             level = levelObj instanceof Number ? ((Number) levelObj).intValue() : 0;
             hStack.setItemLevel(level);
         }

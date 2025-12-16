@@ -209,31 +209,40 @@ public class HRandom {
     }
 
     public static <T extends Comparable<T>> T selectWeightedRandomValue(Map<T, Integer> weights, T minValue) {
+        return selectWeightedRandomValue(weights, minValue, null);
+    }
+
+    public static <T extends Comparable<T>> T selectWeightedRandomValue(Map<T, Integer> weights, T minValue, T maxValue) {
         if (weights == null || weights.isEmpty()) {
             throw new IllegalArgumentException("Weights map cannot be null or empty for weighted random selection.");
         }
-        if (minValue == null) {
+        if (minValue == null && maxValue == null) {
             return selectWeightedRandomValue(weights);
         }
 
         int totalWeight = weights.entrySet().stream()
-                .filter(e -> isAboveOrEqual(e.getKey(), minValue))
+                .filter(e -> isInRange(e.getKey(), minValue, maxValue))
                 .mapToInt(Map.Entry::getValue)
                 .sum();
 
         if (totalWeight <= 0) {
-            throw new IllegalStateException("No valid items found above minValue " + minValue + " or total weight is not positive.");
+            throw new IllegalStateException("No valid items found in range [" + minValue + ", " + maxValue + "] or total weight is not positive.");
         }
 
         int randomIndex = ThreadLocalRandom.current().nextInt(totalWeight);
         for (Map.Entry<T, Integer> entry : weights.entrySet()) {
-            if (!isAboveOrEqual(entry.getKey(), minValue)) continue;
+            if (!isInRange(entry.getKey(), minValue, maxValue)) continue;
             randomIndex -= entry.getValue();
             if (randomIndex < 0) {
                 return entry.getKey();
             }
         }
-        throw new IllegalStateException("Something went wrong with the weighted random selection (with minValue). Total weight: " + totalWeight + ", minValue: " + minValue);
+        throw new IllegalStateException("Something went wrong with the weighted random selection (with range). Total weight: " + totalWeight + ", minValue: " + minValue + ", maxValue: " + maxValue);
+    }
+
+    // We might have mixed types in the map, so we need to be tolerant
+    private static boolean isInRange(Object key, Object minValue, Object maxValue) {
+        return isAboveOrEqual(key, minValue) && isBelowOrEqual(key, maxValue);
     }
 
     // We might have mixed types in the map, so we need to be tolerant
@@ -275,6 +284,49 @@ public class HRandom {
 
         if (key instanceof String ks && minValue instanceof String ms) {
             return ks.compareTo(ms) >= 0;
+        }
+
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean isBelowOrEqual(Object key, Object maxValue) {
+        if (key == null) return false;
+        if (maxValue == null) return true;
+
+        if (key.getClass().isInstance(maxValue) && key instanceof Comparable<?> cmp) {
+            try {
+                int c = ((Comparable<Object>) cmp).compareTo(maxValue);
+                return c <= 0;
+            } catch (ClassCastException ignored) {
+                // Fall through to tolerant checks
+            }
+        }
+
+        if (key instanceof Number kNum && maxValue instanceof Number mNum) {
+            return Double.compare(kNum.doubleValue(), mNum.doubleValue()) <= 0;
+        }
+
+        if (key instanceof String kStr && maxValue instanceof Number mNum2) {
+            try {
+                double kd = Double.parseDouble(kStr.trim());
+                return Double.compare(kd, mNum2.doubleValue()) <= 0;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+
+        if (key instanceof Number kNum2 && maxValue instanceof String mStr) {
+            try {
+                double md = Double.parseDouble(mStr.trim());
+                return Double.compare(kNum2.doubleValue(), md) <= 0;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+
+        if (key instanceof String ks && maxValue instanceof String ms) {
+            return ks.compareTo(ms) <= 0;
         }
 
         return false;
