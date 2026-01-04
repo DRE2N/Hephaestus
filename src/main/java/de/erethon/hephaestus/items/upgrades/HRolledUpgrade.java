@@ -17,11 +17,21 @@ public class HRolledUpgrade {
     private final HItemStack stack;
     private CompoundTag values;
     private int socketIndex = -1; // -1 means unattached/legacy
+    private @Nullable String sourceItemId; // The item ID of the item used as the upgrade source (e.g., orb)
+    private int sourceItemLevel = 1; // The level of the source item (orb)
+    private @Nullable String sourceItemRarity; // The rarity of the source item (orb)
 
     public HRolledUpgrade(HItemStack stack, HItemUpgrade upgrade, @Nullable CompoundTag values) {
         this.upgrade = upgrade;
         this.stack = stack;
         this.values = values;
+    }
+
+    public HRolledUpgrade(HItemStack stack, HItemUpgrade upgrade, @Nullable CompoundTag values, @Nullable String sourceItemId) {
+        this.upgrade = upgrade;
+        this.stack = stack;
+        this.values = values;
+        this.sourceItemId = sourceItemId;
     }
 
     public String getId() {
@@ -46,6 +56,15 @@ public class HRolledUpgrade {
 
     public int getSocketIndex() { return socketIndex; }
     public void setSocketIndex(int socketIndex) { this.socketIndex = socketIndex; }
+
+    public @Nullable String getSourceItemId() { return sourceItemId; }
+    public void setSourceItemId(@Nullable String sourceItemId) { this.sourceItemId = sourceItemId; }
+
+    public int getSourceItemLevel() { return sourceItemLevel; }
+    public void setSourceItemLevel(int sourceItemLevel) { this.sourceItemLevel = sourceItemLevel; }
+
+    public @Nullable String getSourceItemRarity() { return sourceItemRarity; }
+    public void setSourceItemRarity(@Nullable String sourceItemRarity) { this.sourceItemRarity = sourceItemRarity; }
 
     private static String formatNumber(double d) {
         if (Math.abs(d - Math.rint(d)) < 1e-6) {
@@ -111,6 +130,13 @@ public class HRolledUpgrade {
             tag.put("values", new CompoundTag());
         }
         tag.putInt("socketIndex", socketIndex);
+        if (sourceItemId != null) {
+            tag.putString("sourceItemId", sourceItemId);
+            tag.putInt("sourceItemLevel", sourceItemLevel);
+            if (sourceItemRarity != null) {
+                tag.putString("sourceItemRarity", sourceItemRarity);
+            }
+        }
         return tag;
     }
 
@@ -123,6 +149,13 @@ public class HRolledUpgrade {
         CompoundTag val = tag.getCompoundOrEmpty("values");
         HRolledUpgrade r = new HRolledUpgrade(stack, upgrade, val);
         r.socketIndex = tag.contains("socketIndex") ? tag.getInt("socketIndex").get() : -1;
+        if (tag.contains("sourceItemId")) {
+            r.sourceItemId = tag.getString("sourceItemId").get();
+            r.sourceItemLevel = tag.contains("sourceItemLevel") ? tag.getInt("sourceItemLevel").get() : 1;
+            if (tag.contains("sourceItemRarity")) {
+                r.sourceItemRarity = tag.getString("sourceItemRarity").get();
+            }
+        }
         return r;
     }
 }

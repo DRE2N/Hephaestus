@@ -225,8 +225,9 @@ public class HRandom {
                 .mapToInt(Map.Entry::getValue)
                 .sum();
 
+        // If no items in range, fall back to selecting from all items
         if (totalWeight <= 0) {
-            throw new IllegalStateException("No valid items found in range [" + minValue + ", " + maxValue + "] or total weight is not positive.");
+            return selectWeightedRandomValue(weights);
         }
 
         int randomIndex = ThreadLocalRandom.current().nextInt(totalWeight);

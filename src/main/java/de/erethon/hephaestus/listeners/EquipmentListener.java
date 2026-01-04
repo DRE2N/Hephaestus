@@ -30,11 +30,15 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.MainHand;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Set;
+import java.util.UUID;
 
 public class EquipmentListener implements Listener {
 
     private final Hephaestus plugin = Hephaestus.INSTANCE;
+
+    private final HashMap<UUID, Integer> lastMessageTicks = new HashMap<>();
 
     @EventHandler
     private void onEquip(InventoryClickEvent event) {
@@ -50,7 +54,7 @@ public class EquipmentListener implements Listener {
         if (event.getSlotType() != InventoryType.SlotType.ARMOR) {
             if (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT) {
                 if (!canUse(event.getCurrentItem(), player, hCharacter) || !canEquipLevel(player, event.getCurrentItem(), hCharacter)) {
-                    player.sendRichMessage("<red>You cannot equip this item!");
+                    sendMessageIfNotRecently(player, "<red>You cannot equip this item!");
                     event.setCancelled(true);
                 }
                 return;
@@ -65,7 +69,7 @@ public class EquipmentListener implements Listener {
         // Setting an item in the armor slot
         if (event.getCursor().getType() != Material.AIR && (event.getCurrentItem() == null || event.getCurrentItem().getType() == Material.AIR)) {
             if (!canUse(event.getCurrentItem(), player, hCharacter) || !canEquipLevel(player, event.getCurrentItem(), hCharacter)) {
-                player.sendRichMessage("<red>You cannot equip this item!");
+                sendMessageIfNotRecently(player, "<red>You cannot equip this item!");
                 event.setCancelled(true);
             }
         }
@@ -93,7 +97,7 @@ public class EquipmentListener implements Listener {
             return;
         }
         if (!canUse(event.getItem(), player, hCharacter) || !canEquipLevel(player, event.getItem(), hCharacter)) {
-            player.sendRichMessage("<red>You cannot equip this item!");
+            sendMessageIfNotRecently(player, "<red>You cannot equip this item!");
             event.setCancelled(true);
             event.setUseItemInHand(Event.Result.DENY);
         }
@@ -174,7 +178,7 @@ public class EquipmentListener implements Listener {
             return;
         }
         if (!canUse(event.getItem(), player, hCharacter) || !canEquipLevel(player, event.getItem(), hCharacter)) {
-            player.sendRichMessage("<red>You cannot equip this item!");
+            sendMessageIfNotRecently(player, "<red>You cannot equip this item!");
             event.setCancelled(true);
         }
     }
@@ -202,7 +206,7 @@ public class EquipmentListener implements Listener {
         }
         int itemLevel = stack.getItemLevel();
         if (itemLevel >= characterLevel) {
-            player.sendRichMessage("<red>You need to be character level <gold>" + itemLevel + "</gold> to equip this item!");
+            sendMessageIfNotRecently(player, "<red>You need to be character level <gold>" + itemLevel + "</gold> to equip this item!");
             return false;
         }
         return true;
@@ -218,7 +222,7 @@ public class EquipmentListener implements Listener {
         Set<String> armorTags = hCharacter.getTraitline().getArmorTags();
         boolean canUse = itemTags == null || armorTags == null || itemTags.isEmpty() || armorTags.isEmpty();
         if (itemTags == null || armorTags == null) {
-            player.sendRichMessage("<red>You cannot use this item!");
+            sendMessageIfNotRecently(player, "<red>You cannot use this item!");
             return canUse;
         }
         if (itemTags.contains("equipment.armor")) {
@@ -248,7 +252,7 @@ public class EquipmentListener implements Listener {
             }
         }
         if (!canUse) {
-            player.sendRichMessage("<red>Your archetype or discipline cannot use this item!");
+            sendMessageIfNotRecently(player, "<red>Your archetype or discipline cannot use this item!");
         }
         return canEquipLevel(player, stack, hCharacter) && canUse;
     }
@@ -286,6 +290,20 @@ public class EquipmentListener implements Listener {
             event.setCancelled(true);
             return;
         }
+    }
+
+    // Some of these events are rather spammy, so we limit how often we send messages
+    private void sendMessageIfNotRecently(Player player, String message) {
+        int currentTick = plugin.getServer().getCurrentTick();
+        UUID playerId = player.getUniqueId();
+        if (lastMessageTicks.containsKey(playerId)) {
+            int lastTick = lastMessageTicks.get(playerId);
+            if (currentTick - lastTick < 200) {
+                return;
+            }
+        }
+        player.sendRichMessage(message);
+        lastMessageTicks.put(playerId, currentTick);
     }
 
 
