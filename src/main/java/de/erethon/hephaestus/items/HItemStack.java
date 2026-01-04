@@ -174,13 +174,24 @@ public class HItemStack {
     }
 
     public void removeUpgrade(HRolledUpgrade upgrade) {
-        upgrades.remove(upgrade);
+        // Remove by matching socket index and upgrade ID, not by object identity
+        int socketIndex = upgrade.getSocketIndex();
+        String upgradeId = upgrade.getId();
+        boolean removed = upgrades.removeIf(u -> u.getId().equals(upgradeId) && u.getSocketIndex() == socketIndex);
+        // If this upgrade was in a socket, clear the socket
+        if (socketIndex >= 0 && socketIndex < sockets.size()) {
+            sockets.get(socketIndex).setInserted(null);
+        }
         saveChanges();
+        rebuildAttributes();
+        updateVisuals();
     }
 
     public void removeUpgrade(HItemUpgrade upgrade) {
         upgrades.removeIf(u -> u.getUpgrade().equals(upgrade));
         saveChanges();
+        rebuildAttributes();
+        updateVisuals();
     }
 
     public List<HRolledUpgrade> getUpgrades() {
@@ -263,8 +274,8 @@ public class HItemStack {
             if (!s.isEmpty()) continue;
             boolean colorMatch = s.getColor() == OrbColor.PRISMATIC || orbColor == OrbColor.PRISMATIC || s.getColor() == orbColor;
             if (colorMatch) {
-                // Pass orb level so upgrade rolls at orb's level
-                HUpgradeResult res = addUpgradeToSocket(upgradeId, i, orbStack.getItemLevel());
+                // Pass orb level and rarity so we can recreate the orb later
+                HUpgradeResult res = addUpgradeToSocket(upgradeId, i, orbStack.getItemLevel(), orbStack.getItem().getKey().toString(), orbStack.getRarity().name());
                 return res;
             } else if (firstColorMismatchSocket == -1) {
                 firstColorMismatchSocket = i;
@@ -276,7 +287,7 @@ public class HItemStack {
         return HUpgradeResult.NO_EMPTY_SOCKET;
     }
 
-    private HUpgradeResult addUpgradeToSocket(String upgradeId, int socketIndex, int sourceLevel) {
+    private HUpgradeResult addUpgradeToSocket(String upgradeId, int socketIndex, int sourceLevel, String sourceItemId, String sourceItemRarity) {
         if (socketIndex < 0 || socketIndex >= sockets.size()) return HUpgradeResult.INVALID_ITEM;
         OrbSocket socket = sockets.get(socketIndex);
         if (!socket.isEmpty()) return HUpgradeResult.INVALID_ITEM;
@@ -299,6 +310,9 @@ public class HItemStack {
         HRolledUpgrade rolled = upgrade.rollAtLevel(this, sourceLevel);
         if (rolled == null) return HUpgradeResult.INVALID_UPGRADE;
         rolled.setSocketIndex(socketIndex);
+        rolled.setSourceItemId(sourceItemId);
+        rolled.setSourceItemLevel(sourceLevel);
+        rolled.setSourceItemRarity(sourceItemRarity);
         upgrades.add(rolled);
         socket.setInserted(rolled);
         saveChanges();

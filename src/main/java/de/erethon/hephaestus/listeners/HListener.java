@@ -4,6 +4,7 @@ import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.events.HItemEquipEvent;
 import de.erethon.hephaestus.events.HItemUnequipEvent;
+import de.erethon.hephaestus.items.Grindstone;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.utils.HUpgradeResult;
 import de.erethon.papyrus.events.ContainerLoadEvent;
@@ -13,6 +14,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -113,17 +115,27 @@ public class HListener implements Listener {
         if (!(event.hasItem() && event.getItem() != null)) {
             return;
         }
-        org.bukkit.inventory.ItemStack item = event.getItem();
-        if (item.getType() == org.bukkit.Material.AIR) {
+        if (event.getItem() == null) {
             return;
         }
-        HItemStack stack = Hephaestus.getStack(item);
+        HItemStack stack = Hephaestus.getStack(event.getItem());
         if (stack == null) {
             return;
         }
         stack.getItem().runInteractActions(stack, event);
         if (event.getAction().isRightClick()) {
             stack.getItem().runRightClickSpells(event.getPlayer(), stack);
+        }
+
+        // Handle grindstone interaction
+        if (event.getAction().isRightClick() && event.getClickedBlock() != null) {
+            Grindstone grindstone = Grindstone.fromBlock(event.getClickedBlock());
+            if (grindstone != null) {
+                event.setCancelled(true);
+                grindstone.onRightClick(event.getPlayer(), event.getItem());
+            } else if (event.getClickedBlock().getType() == Material.SMOKER) {
+                event.setCancelled(true);
+            }
         }
     }
 
