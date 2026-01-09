@@ -8,12 +8,15 @@ import de.erethon.hephaestus.items.upgrades.HItemUpgrade;
 import de.erethon.hephaestus.items.upgrades.HRolledUpgrade;
 import de.erethon.hephaestus.utils.HUpgradeResult;
 import io.papermc.paper.adventure.PaperAdventure;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import it.unimi.dsi.fastutil.objects.ReferenceLinkedOpenHashSet;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.translation.TranslationRegistry;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -25,12 +28,16 @@ import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.item.component.TooltipDisplay;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Map;
+import java.util.Set;
 
 // A HItemStack is an item in the world, and has various properties. It references a HItem, which is the base item and acts as a template for the item.
 public class HItemStack {
@@ -45,6 +52,7 @@ public class HItemStack {
     private String playerAddedName = "";
     private final List<HRolledUpgrade> upgrades = new ArrayList<>();
     private final List<OrbSocket> sockets = new ArrayList<>();
+    private final Map<String, Double> rolledBaseAttributes = new HashMap<>();
 
     private ItemStack stack;
 
@@ -96,9 +104,31 @@ public class HItemStack {
 
     public void setItemLevel(int itemLevel) {
         this.itemLevel = itemLevel;
+        // Roll base attributes for this level if not already set
+        if (item != null && item.hasBaseAttributes() && rolledBaseAttributes.isEmpty()) {
+            rollBaseAttributes();
+        }
         saveChanges();
         rebuildAttributes();
         updateVisuals();
+    }
+
+    /**
+     * Rolls the base attributes for this item based on the current item level.
+     * This will replace any previously rolled base attributes.
+     */
+    public void rollBaseAttributes() {
+        if (item == null || !item.hasBaseAttributes()) return;
+        rolledBaseAttributes.clear();
+        rolledBaseAttributes.putAll(item.rollBaseAttributes(itemLevel));
+    }
+
+    /**
+     * Gets the rolled base attributes for this item stack.
+     * @return an unmodifiable map of attribute keys to rolled values
+     */
+    public Map<String, Double> getRolledBaseAttributes() {
+        return Collections.unmodifiableMap(rolledBaseAttributes);
     }
 
     public int getItemLevel() {
@@ -444,6 +474,24 @@ public class HItemStack {
             return; // Do not render sockets for orb items
         }
 
+        // Base attributes section (always shown if present)
+        if (!rolledBaseAttributes.isEmpty()) {
+            lore.add(PaperAdventure.asVanilla(Component.empty()));
+            List<String> baseAttrKeys = new ArrayList<>(rolledBaseAttributes.keySet());
+            baseAttrKeys.sort(String::compareTo);
+            for (String key : baseAttrKeys) {
+                double value = rolledBaseAttributes.get(key);
+                String display = getAttributeTranslationKey(key);
+                String numberStr = formatNumber(value);
+                boolean negative = value < 0;
+                NamedTextColor numberColor = negative ? NamedTextColor.RED : NamedTextColor.GREEN;
+                String prefix = negative ? "" : "+";
+                Component line = Component.text(prefix + numberStr + " ", numberColor)
+                        .append(Component.translatable(display, NamedTextColor.GRAY));
+                lore.add(PaperAdventure.asVanilla(line));
+            }
+        }
+
         // Sockets section (equipment only)
         if (hasSockets()) {
             lore.add(PaperAdventure.asVanilla(Component.empty()));
@@ -535,6 +583,17 @@ public class HItemStack {
                 if (oc != null) sockets.add(new OrbSocket(oc));
             }
         }
+        // Load rolled base attributes
+        if (data.contains("baseAttributes")) {
+            rolledBaseAttributes.clear();
+            CompoundTag baseAttrsTag = data.getCompoundOrEmpty("baseAttributes");
+            for (String key : baseAttrsTag.keySet()) {
+                Optional<Double> valOpt = baseAttrsTag.getDouble(key);
+                if (valOpt.isPresent()) {
+                    rolledBaseAttributes.put(key, valOpt.get());
+                }
+            }
+        }
         loadUpgradesFromTag(data);
     }
 
@@ -556,6 +615,12 @@ public class HItemStack {
         var list = new net.minecraft.nbt.ListTag();
         for (OrbSocket s : sockets) list.add(net.minecraft.nbt.StringTag.valueOf(s.getColor().name()));
         data.put("sockets", list);
+        // Persist rolled base attributes
+        CompoundTag baseAttrsTag = new CompoundTag();
+        for (Map.Entry<String, Double> entry : rolledBaseAttributes.entrySet()) {
+            baseAttrsTag.putDouble(entry.getKey(), entry.getValue());
+        }
+        data.put("baseAttributes", baseAttrsTag);
         CompoundTag upgradesTag = new CompoundTag();
         saveUpgradesInTag(upgradesTag);
         data.put("upgrades", upgradesTag);
@@ -594,6 +659,27 @@ public class HItemStack {
         if (item == null || item.isVanilla()) return;
         ItemAttributeModifiers.Builder builder = ItemAttributeModifiers.builder();
         int uniqueCounter = 0; // ensure unique modifier IDs when multiple of same attribute
+
+        // Add rolled base attributes first
+        for (Map.Entry<String, Double> entry : rolledBaseAttributes.entrySet()) {
+            try {
+                Identifier rl = Identifier.parse(entry.getKey());
+                var holderOpt = BuiltInRegistries.ATTRIBUTE.get(rl);
+                if (holderOpt.isEmpty()) continue; // unknown attribute
+                String pathPart = "base-" + rl.getNamespace() + "_" + rl.getPath();
+                pathPart += "-" + uniqueCounter++;
+                Identifier modifierId = Identifier.tryParse("hephaestus:" + pathPart.toLowerCase(Locale.ROOT));
+                if (modifierId == null) {
+                    Hephaestus.INSTANCE.getLogger().warning("Invalid generated modifier id path for base attribute " + entry.getKey() + ": " + pathPart);
+                    continue;
+                }
+                AttributeModifier modifier = new AttributeModifier(modifierId, entry.getValue(), AttributeModifier.Operation.ADD_VALUE);
+                builder.add(holderOpt.get(), modifier, EquipmentSlotGroup.ANY);
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Add upgrade attributes
         for (HRolledUpgrade u : upgrades) {
             if (u.getValues() == null || u.getValues().isEmpty()) continue;
             for (String k : u.getValues().keySet()) {
@@ -618,7 +704,9 @@ public class HItemStack {
                 }
             }
         }
-        stack.set(DataComponents.ATTRIBUTE_MODIFIERS, builder.build());
+        // Hide the vanilla attribute tooltip since we render our own in the lore
+        TooltipDisplay tooltipDisplay = new TooltipDisplay(false, new ReferenceLinkedOpenHashSet<>()).withHidden(DataComponents.ATTRIBUTE_MODIFIERS, true);
+        stack.set(DataComponents.TOOLTIP_DISPLAY, tooltipDisplay);
     }
 
     public static HItemStack getFromStack(ItemStack stack) {

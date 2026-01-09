@@ -49,6 +49,7 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -76,6 +77,10 @@ public class HItem {
     private final List<OrbColor> socketColors = new ArrayList<>();
     private OrbColor orbColor = null; // if this item is an orb itself
     private String grantedUpgradeId = null; // upgrade granted when inserted
+
+    // Base attributes (especially for armor) - supports level-based random ranges
+    // Map: attributeKey -> level -> (range -> weight)
+    private final Map<String, Map<Integer, Map<double[], Integer>>> baseAttributeDefinitions = new HashMap<>();
 
     // Blocks
     private float breakSpeedModifier = 1.0f;
@@ -409,6 +414,55 @@ public class HItem {
     public @Nullable String getGrantedUpgradeId() { return grantedUpgradeId; }
 
     /**
+     * Gets the base attribute definitions for this item.
+     * Base attributes are always applied to the item, independent of upgrades or orbs.
+     * The map structure is: attributeKey -> level -> (range -> weight)
+     * @return an unmodifiable map of base attribute definitions
+     */
+    public Map<String, Map<Integer, Map<double[], Integer>>> getBaseAttributeDefinitions() {
+        return Collections.unmodifiableMap(baseAttributeDefinitions);
+    }
+
+    /**
+     * Checks if this item has any base attribute definitions.
+     * @return true if the item has base attributes defined
+     */
+    public boolean hasBaseAttributes() {
+        return !baseAttributeDefinitions.isEmpty();
+    }
+
+    /**
+     * Rolls base attributes for the given item level.
+     * @param level the item level to roll attributes for
+     * @return a map of attribute keys to rolled values
+     */
+    public Map<String, Double> rollBaseAttributes(int level) {
+        Map<String, Double> rolled = new HashMap<>();
+        for (Map.Entry<String, Map<Integer, Map<double[], Integer>>> entry : baseAttributeDefinitions.entrySet()) {
+            String attrKey = entry.getKey();
+            Map<Integer, Map<double[], Integer>> perLevel = entry.getValue();
+
+            // Find exact level or nearest lower level
+            Map<double[], Integer> levelModifiers = perLevel.get(level);
+            if (levelModifiers == null) {
+                int best = Integer.MIN_VALUE;
+                for (Integer defined : perLevel.keySet()) {
+                    if (defined <= level && defined > best) best = defined;
+                }
+                if (best != Integer.MIN_VALUE) {
+                    levelModifiers = perLevel.get(best);
+                }
+            }
+
+            if (levelModifiers == null || levelModifiers.isEmpty()) continue;
+
+            double value = HRandom.selectWeightedCurveValue(levelModifiers);
+            rolled.put(attrKey, value);
+        }
+        return rolled;
+    }
+
+    /**
      * Gets the sound played when this item is placed, if it is placeable (has a block state)
      * If no custom sound is defined, it defaults to BLOCK_STONE_PLACE.
      * @return the placement sound
@@ -583,6 +637,83 @@ public class HItem {
         }
         if (isOrbItem()) {
             tags.add("orb");
+        }
+
+        // Load base attributes with level-based random ranges
+        if (config.contains("baseAttributes")) {
+            ConfigurationSection baseAttrSection = config.getConfigurationSection("baseAttributes");
+            if (baseAttrSection != null) {
+                for (String attrKey : baseAttrSection.getKeys(false)) {
+                    String fullKey = attrKey.contains(":") ? attrKey : "minecraft:" + attrKey;
+                    Map<Integer, Map<double[], Integer>> levelModifiers = new HashMap<>();
+
+                    // Check if it's a simple value or level-based config
+                    if (baseAttrSection.isDouble(attrKey) || baseAttrSection.isInt(attrKey)) {
+                        // Simple fixed value - apply at all levels
+                        double value = baseAttrSection.getDouble(attrKey);
+                        Map<double[], Integer> fixedRange = new HashMap<>();
+                        fixedRange.put(new double[]{value, value}, 1);
+                        levelModifiers.put(0, fixedRange);
+                    } else {
+                        // Level-based config like upgrades
+                        ConfigurationSection perAttribute = baseAttrSection.getConfigurationSection(attrKey);
+                        if (perAttribute != null) {
+                            for (String levelKey : perAttribute.getKeys(false)) {
+                                int level;
+                                try { level = Integer.parseInt(levelKey); } catch (NumberFormatException ex) { continue; }
+
+                                // Check if it's a list-based config (with min/max/weight entries)
+                                List<Map<?, ?>> rangeList = perAttribute.getMapList(levelKey);
+                                if (!rangeList.isEmpty()) {
+                                    Map<double[], Integer> rangeWeights = new HashMap<>();
+                                    for (Map<?, ?> rangeMap : rangeList) {
+                                        Object minObj = rangeMap.get("min");
+                                        Object maxObj = rangeMap.get("max");
+                                        Object weightObj = rangeMap.get("weight");
+
+                                        if (minObj instanceof Number && maxObj instanceof Number && weightObj instanceof Number) {
+                                            double min = ((Number) minObj).doubleValue();
+                                            double max = ((Number) maxObj).doubleValue();
+                                            int weight = ((Number) weightObj).intValue();
+
+                                            if (weight > 0 && max >= min) {
+                                                rangeWeights.put(new double[]{min, max}, weight);
+                                            }
+                                        }
+                                    }
+                                    if (!rangeWeights.isEmpty()) {
+                                        levelModifiers.put(level, rangeWeights);
+                                    }
+                                    continue;
+                                }
+
+                                // Fall back to discrete value format
+                                ConfigurationSection valueSection = perAttribute.getConfigurationSection(levelKey);
+                                if (valueSection == null) continue;
+
+                                Map<double[], Integer> weights = new HashMap<>();
+                                for (String valueKey : valueSection.getKeys(false)) {
+                                    try {
+                                        double val = Double.parseDouble(valueKey);
+                                        int weight = valueSection.getInt(valueKey, 0);
+                                        if (weight > 0) {
+                                            weights.put(new double[]{val, val}, weight);
+                                        }
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                                if (!weights.isEmpty()) {
+                                    levelModifiers.put(level, weights);
+                                }
+                            }
+                        }
+                    }
+
+                    if (!levelModifiers.isEmpty()) {
+                        baseAttributeDefinitions.put(fullKey, levelModifiers);
+                        plugin.getLogger().info("Loaded base attribute " + fullKey + " with " + levelModifiers.size() + " level definitions for item " + key);
+                    }
+                }
+            }
         }
 
         levelWeights = HRandom.loadWeights(config, "random.level");
