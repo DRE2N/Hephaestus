@@ -8,6 +8,8 @@ import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
 import de.erethon.hephaestus.jobs.crafting.JobRecipe;
 import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
 import de.erethon.hephaestus.jobs.crafting.RecipeManager;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.TooltipDisplay;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -103,6 +105,7 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
         }
 
         item.setItemMeta(meta);
+        item.setData(DataComponentTypes.TOOLTIP_DISPLAY, TooltipDisplay.tooltipDisplay().hideTooltip(true).build());
         return item;
     }
 

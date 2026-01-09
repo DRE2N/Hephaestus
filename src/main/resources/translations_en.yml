@@ -62,7 +62,7 @@ crafting:
         lore: "Discovered recipes will appear here"
     craft:
       title: "Craft Item"
-      lore1: "Select a recipe and place ingredients"
+      lore1: "Select a recipe first"
       lore2: "to craft items"
     result:
       title: "Craft Result"

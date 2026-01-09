@@ -3,7 +3,6 @@ package de.erethon.hephaestus.jobs.crafting.gui;
 import de.erethon.hecate.data.HCharacter;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.events.HJobCraftItemEvent;
-import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
 import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
 import de.erethon.hephaestus.jobs.crafting.JobRecipe;
@@ -11,7 +10,6 @@ import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
 import de.erethon.hephaestus.jobs.crafting.RecipeIngredient;
 import de.erethon.hephaestus.jobs.crafting.RecipeManager;
 import de.erethon.hephaestus.jobs.crafting.RecipeResult;
-import io.papermc.paper.datacomponent.DataComponentType;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.ItemLore;
 import io.papermc.paper.datacomponent.item.TooltipDisplay;
@@ -21,7 +19,6 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.kyori.adventure.translation.GlobalTranslator;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -59,34 +56,27 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
     private int totalCraftingTime = 0;
     private BukkitTask progressTask = null;
 
-    // Ingredient slots - 3 rows x 2 columns on the left (6 slots total, vertical layout)
-    private static final int[] CRAFTING_SLOTS = {0, 1, 9, 10, 18, 19};
-
-    // Recipe display slots - 3 columns x 5 rows on the right side
+    // Recipe display slots - 4 rows x 9 columns (36 slots total)
     private static final int[] ACTUAL_RECIPE_SLOTS = {
-        5, 6, 7, 8,
-        14, 15, 16, 17,
-        23, 24, 25, 26,
-        32, 33, 34, 35,
-        41, 42, 43, 44
+        0, 1, 2, 3, 4, 5, 6, 7, 8,
+        9, 10, 11, 12, 13, 14, 15, 16, 17,
+        18, 19, 20, 21, 22, 23, 24, 25, 26,
+        27, 28, 29, 30, 31, 32, 33, 34, 35
     };
 
-    // UI controls - Minecraft-style layout
-    private static final int CRAFT_RESULT_SLOT = 3; // Right of ingredients, Minecraft-style
+    // Row 5: Control buttons (slots 36-44)
+    private static final int QUANTITY_DECREASE_SLOT = 36;
+    private static final int QUANTITY_DISPLAY_SLOT = 37;
+    private static final int QUANTITY_INCREASE_SLOT = 38;
+    private static final int CRAFT_BUTTON_SLOT = 40;
+    private static final int CRAFT_RESULT_SLOT = 42;
 
-    // Control buttons in lower left area
-    private static final int CRAFT_BUTTON_SLOT = 12; // Center
-    private static final int DISCOVERY_BUTTON_SLOT = 47;
+    // Row 6: Navigation and utility buttons (slots 45-53)
+    private static final int DISCOVERY_BUTTON_SLOT = 45;
+    private static final int PREV_PAGE_SLOT = 48;
+    private static final int NEXT_PAGE_SLOT = 50;
 
-    private static final int QUANTITY_DECREASE_SLOT = 37; // Bottom left corner
-    private static final int QUANTITY_DISPLAY_SLOT = 38;
-    private static final int QUANTITY_INCREASE_SLOT = 39;
-
-    // Navigation buttons below the recipe list (bottom right)
-    private static final int PREV_PAGE_SLOT = 50;
-    private static final int NEXT_PAGE_SLOT = 53;
-
-    private static final int RECIPES_PER_PAGE = 20;
+    private static final int RECIPES_PER_PAGE = 36;
 
     public CraftingStationGUI(Hephaestus plugin, Player player) {
         this.plugin = plugin;
@@ -108,12 +98,7 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
             inventory.setItem(i, dummy);
         }
 
-        // Clear ingredient slots (no backgrounds)
-        for (int slot : CRAFTING_SLOTS) {
-            inventory.setItem(slot, null);
-        }
-
-        // Clear recipe display slots
+        // Clear recipe display slots (top 4 rows)
         for (int slot : ACTUAL_RECIPE_SLOTS) {
             inventory.setItem(slot, null);
         }
@@ -419,47 +404,33 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
         int slot = event.getRawSlot();
 
+        // Cancel all clicks in the GUI inventory
         if (slot >= 0 && slot < 54) {
+            event.setCancelled(true);
+
             if (slot == PREV_PAGE_SLOT && currentPage > 0) {
-                event.setCancelled(true);
                 currentPage--;
                 updateRecipeDisplay();
             } else if (slot == NEXT_PAGE_SLOT) {
-                event.setCancelled(true);
                 int maxPages = Math.max(0, (availableRecipes.size() - 1) / RECIPES_PER_PAGE);
                 if (currentPage < maxPages) {
                     currentPage++;
                     updateRecipeDisplay();
                 }
             } else if (slot == QUANTITY_DECREASE_SLOT) {
-                event.setCancelled(true);
                 adjustQuantity(event.getClick() == ClickType.SHIFT_LEFT ? -10 : -1);
             } else if (slot == QUANTITY_INCREASE_SLOT) {
-                event.setCancelled(true);
                 adjustQuantity(event.getClick() == ClickType.SHIFT_LEFT ? 10 : 1);
-            } else if (slot == QUANTITY_DISPLAY_SLOT) {
-                event.setCancelled(true);
-                // Display slot is read-only
             } else if (slot == DISCOVERY_BUTTON_SLOT) {
-                event.setCancelled(true);
                 new RecipeDiscoveryGUI(plugin, player).open();
             } else if (slot == CRAFT_BUTTON_SLOT) {
-                event.setCancelled(true);
                 if (selectedRecipe != null && canCraftQuantity()) {
                     startCrafting();
                 }
-            } else if (slot == CRAFT_RESULT_SLOT) {
-                event.setCancelled(true);
-                // Result slot is display only
-            } else if (isCraftingSlot(slot)) {
-                // Allow normal item placement/removal in crafting slots
-                Bukkit.getScheduler().runTaskLater(plugin, this::updateCraftingState, 1L);
             } else if (isRecipeSlot(slot)) {
-                event.setCancelled(true);
                 selectRecipeFromSlot(slot);
-            } else {
-                event.setCancelled(true);
             }
+            // QUANTITY_DISPLAY_SLOT and CRAFT_RESULT_SLOT are display only, no action needed
         }
     }
 
@@ -610,7 +581,7 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
         if (!canCraft) {
             lore.add(Component.text(""));
-            lore.add(Component.text("Place ingredients in crafting slots!", NamedTextColor.RED));
+            lore.add(Component.text("You are lacking the ingredients for this recipe", NamedTextColor.RED));
         } else {
             lore.add(Component.text(""));
             int totalTime = calculateTotalCraftingTime(selectedRecipe.getCraftingTime(), craftQuantity);
@@ -627,8 +598,7 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
     private int countItemsInCraftingSlots(String itemId) {
         int count = 0;
-        for (int slot : CRAFTING_SLOTS) {
-            ItemStack item = inventory.getItem(slot);
+        for (ItemStack item : player.getInventory().getContents()) {
             if (item == null) continue;
 
             HItemStack hStack = HItemStack.getFromStack(item);
@@ -645,8 +615,7 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         }
 
         int count = 0;
-        for (int slot : CRAFTING_SLOTS) {
-            ItemStack item = inventory.getItem(slot);
+        for (ItemStack item : player.getInventory().getContents()) {
             if (item == null) continue;
 
             HItemStack hStack = HItemStack.getFromStack(item);
@@ -662,20 +631,17 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
     private List<ItemStack> getIngredientsFromSlots() {
         List<ItemStack> ingredients = new ArrayList<>();
-        for (int slot : CRAFTING_SLOTS) {
-            ItemStack item = inventory.getItem(slot);
+        for (ItemStack item : player.getInventory().getContents()) {
             if (item != null && !item.getType().isAir()) {
-                ingredients.add(item);
+                HItemStack hStack = HItemStack.getFromStack(item);
+                if (hStack != null) {
+                    ingredients.add(item);
+                }
             }
         }
         return ingredients;
     }
 
-    private void updateCraftingState() {
-        if (selectedRecipe != null) {
-            updateCraftButton();
-        }
-    }
 
     /**
      * Calculate total crafting time with diminishing returns for bulk crafting.
@@ -785,11 +751,12 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
             int found = 0;
             Map<Integer, Integer> slotConsumption = new HashMap<>();
 
-            // Find items in slots that match this ingredient
-            for (int slot : CRAFTING_SLOTS) {
+            // Find items in player inventory that match this ingredient
+            ItemStack[] contents = player.getInventory().getContents();
+            for (int slot = 0; slot < contents.length; slot++) {
                 if (found >= needed) break;
 
-                ItemStack item = inventory.getItem(slot);
+                ItemStack item = contents[slot];
                 if (item == null) continue;
 
                 HItemStack hStack = HItemStack.getFromStack(item);
@@ -813,16 +780,16 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
             consumptionPlan.add(slotConsumption);
         }
 
-        // All checks passed, actually consume the items
+        // All checks passed, actually consume the items from player inventory
         for (Map<Integer, Integer> slotConsumption : consumptionPlan) {
             for (Map.Entry<Integer, Integer> entry : slotConsumption.entrySet()) {
                 int slot = entry.getKey();
                 int amount = entry.getValue();
 
-                ItemStack item = inventory.getItem(slot);
+                ItemStack item = player.getInventory().getItem(slot);
                 if (item != null) {
                     if (item.getAmount() <= amount) {
-                        inventory.setItem(slot, null);
+                        player.getInventory().setItem(slot, null);
                     } else {
                         item.setAmount(item.getAmount() - amount);
                     }
@@ -909,13 +876,6 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
     @EventHandler
     public void onInventoryClose(InventoryCloseEvent event) {
         if (event.getInventory().equals(inventory)) {
-            for (int slot : CRAFTING_SLOTS) {
-                ItemStack item = inventory.getItem(slot);
-                if (item != null) {
-                    player.getInventory().addItem(item);
-                }
-            }
-
             if (craftingTask != null && !craftingTask.isCancelled()) {
                 craftingTask.cancel();
                 GUIUtils.updateTitle(player, Component.text("Crafting Station", NamedTextColor.DARK_GREEN));
@@ -924,15 +884,6 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
             InventoryClickEvent.getHandlerList().unregister(this);
             InventoryCloseEvent.getHandlerList().unregister(this);
         }
-    }
-
-    private boolean isCraftingSlot(int slot) {
-        for (int craftingSlot : CRAFTING_SLOTS) {
-            if (slot == craftingSlot) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean isRecipeSlot(int slot) {

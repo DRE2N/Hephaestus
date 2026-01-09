@@ -62,7 +62,7 @@ crafting:
         lore: "Entdeckte Rezepte werden hier angezeigt"
     craft:
       title: "Item herstellen"
-      lore1: "Wähle ein Rezept und platziere Zutaten"
+      lore1: "Wähle ein Rezept"
       lore2: "um Items herzustellen"
     result:
       title: "Herstellungsergebnis"
