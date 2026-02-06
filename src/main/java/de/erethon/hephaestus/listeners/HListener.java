@@ -1,11 +1,14 @@
 package de.erethon.hephaestus.listeners;
 
 import com.destroystokyo.paper.event.player.PlayerArmorChangeEvent;
+import de.erethon.hecate.data.HCharacter;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.events.HItemEquipEvent;
 import de.erethon.hephaestus.events.HItemUnequipEvent;
 import de.erethon.hephaestus.items.Grindstone;
 import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
+import de.erethon.hephaestus.jobs.crafting.gui.CraftingStationGUI;
 import de.erethon.hephaestus.utils.HUpgradeResult;
 import de.erethon.papyrus.events.ContainerLoadEvent;
 import de.erethon.papyrus.events.PlayerInventoryLoadEvent;
@@ -135,6 +138,25 @@ public class HListener implements Listener {
                 grindstone.onRightClick(event.getPlayer(), event.getItem());
             } else if (event.getClickedBlock().getType() == Material.SMOKER) {
                 event.setCancelled(true);
+            }
+        }
+
+        // Handle job crafting block interaction
+        if (event.getAction().isRightClick() && event.getClickedBlock() != null) {
+            Material blockType = event.getClickedBlock().getType();
+            if (blockType == Material.BEDROCK) {
+                return; // Bedrock is used as a placeholder for "no crafting block" in jobs, so ignore it
+            }
+            HCharacter character = JobCharacterBridgeUtil.getCharacter(event.getPlayer());
+            if (character != null) {
+                Hephaestus.INSTANCE.getJobManager().getCharacterJob(character.getCharacterID()).thenAccept(job -> {
+                    if (job != null) {
+                        if (job.getCraftingBlock() == blockType) {
+                            event.setCancelled(true);
+                            new CraftingStationGUI(Hephaestus.INSTANCE, event.getPlayer()).open();
+                        }
+                    }
+                });
             }
         }
     }

@@ -537,6 +537,7 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
         updateQuantityDisplay();
         updateCraftButton();
+        GUIUtils.updateTitle(player, Component.text("Crafting: " + getItemDisplayName(recipe.getDisplayResult().getItemId()), NamedTextColor.DARK_GREEN));
     }
 
     private void updateCraftButton() {

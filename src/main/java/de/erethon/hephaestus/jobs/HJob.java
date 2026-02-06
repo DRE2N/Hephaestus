@@ -1,6 +1,8 @@
 package de.erethon.hephaestus.jobs;
 
 import net.kyori.adventure.text.Component;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
 
 import java.util.HashMap;
@@ -11,19 +13,21 @@ public class HJob {
 
     private final String id;
     private final String description;
+    private final Material craftingBlock; // Optional: the block used for crafting in this job, can be bedrock for no specific block
     private final int maxLevel;
     private final Map<String, Object> properties;
     private final Map<String, String> nameTranslations;
     private final Map<String, String> descriptionTranslations;
 
     public HJob(String id, String description, int maxLevel,
-                Map<String, Object> properties, Map<String, String> nameTranslations, Map<String, String> descriptionTranslations) {
+                Map<String, Object> properties, Map<String, String> nameTranslations, Map<String, String> descriptionTranslations, Material craftingBlock) {
         this.id = id;
         this.description = description;
         this.maxLevel = maxLevel;
         this.properties = properties != null ? new HashMap<>(properties) : new HashMap<>();
         this.nameTranslations = nameTranslations != null ? new HashMap<>(nameTranslations) : new HashMap<>();
         this.descriptionTranslations = descriptionTranslations != null ? new HashMap<>(descriptionTranslations) : new HashMap<>();
+        this.craftingBlock = craftingBlock != null ? craftingBlock : Material.BEDROCK; // Default to bedrock if not specified
     }
 
     public String getId() {
@@ -46,8 +50,8 @@ public class HJob {
         return maxLevel;
     }
 
-    public Map<String, Object> getProperties() {
-        return new HashMap<>(properties);
+    public Material getCraftingBlock() {
+        return craftingBlock;
     }
 
     public Object getProperty(String key) {
@@ -66,6 +70,7 @@ public class HJob {
         section.set("id", id);
         section.set("description", description);
         section.set("maxLevel", maxLevel);
+        section.set("block", craftingBlock.getKey().toString());
 
         if (!properties.isEmpty()) {
             ConfigurationSection propertiesSection = section.createSection("properties");
@@ -94,6 +99,11 @@ public class HJob {
         String description = section.getString("description");
         List<String> allowedItems = section.getStringList("allowedItems");
         int maxLevel = section.getInt("maxLevel", 100);
+        Material craftingBlock = Material.BEDROCK; // Default to bedrock
+        NamespacedKey blockKey = NamespacedKey.fromString(section.getString("block", "minecraft:bedrock"));
+        if (blockKey != null && !blockKey.key().toString().equals("bedrock")) {
+            Material blockMaterial = Material.getMaterial(blockKey.getKey());
+        }
 
         Map<String, Object> properties = new HashMap<>();
         ConfigurationSection propertiesSection = section.getConfigurationSection("properties");
@@ -116,7 +126,7 @@ public class HJob {
             }
         }
 
-        return new HJob(id, description, maxLevel, properties, nameTranslations, descriptionTranslations);
+        return new HJob(id, description, maxLevel, properties, nameTranslations, descriptionTranslations, craftingBlock);
     }
 
     @Override
