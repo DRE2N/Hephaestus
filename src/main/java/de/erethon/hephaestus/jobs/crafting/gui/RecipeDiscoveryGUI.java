@@ -305,12 +305,25 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
     }
 
     private void showRecipeResult(JobRecipe recipe) {
-        HItemStack resultStack = plugin.getLibrary().get(recipe.getResult().getItemId())
-            .createStack(recipe.getResult().getAmount(), recipe.getResult().getItemLevel(),
-                        recipe.getResult().getSocketPattern(), recipe.getResult().getRarity());
+        RecipeResult recipeResult = recipe.getDisplayResult();
+        if (recipeResult == null || recipeResult.getItemId() == null) {
+            plugin.getLogger().warning("Recipe '" + recipe.getId() + "' has no valid result to display");
+            setResultSlot(null);
+            return;
+        }
+        var hItem = plugin.getLibrary().get(recipeResult.getItemId());
+        if (hItem == null) {
+            plugin.getLogger().warning("Recipe '" + recipe.getId() + "' result item '" + recipeResult.getItemId() + "' does not exist in the item library");
+            setResultSlot(null);
+            return;
+        }
+        HItemStack resultStack = hItem.createStack(recipeResult.getAmount(), recipeResult.getItemLevel(),
+                    recipeResult.getSocketPattern(), recipeResult.getRarity());
 
         if (resultStack != null) {
             setResultSlot(resultStack.getBukkitStack());
+        } else {
+            setResultSlot(null);
         }
     }
 

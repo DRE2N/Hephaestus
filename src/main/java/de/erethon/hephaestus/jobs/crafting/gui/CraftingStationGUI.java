@@ -304,11 +304,17 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
 
         for (int i = startIndex; i < endIndex; i++) {
             JobRecipe recipe = availableRecipes.get(i);
-            ItemStack recipeItem = createRecipeDisplayItem(recipe);
-
             int slotIndex = i - startIndex;
-            if (slotIndex < ACTUAL_RECIPE_SLOTS.length) {
+            if (slotIndex >= ACTUAL_RECIPE_SLOTS.length) continue;
+            try {
+                ItemStack recipeItem = createRecipeDisplayItem(recipe);
                 inventory.setItem(ACTUAL_RECIPE_SLOTS[slotIndex], recipeItem);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to create display item for recipe '" + recipe.getId() + "': " + e.getMessage());
+                ItemStack errorItem = createTranslatableGuiItem(Material.BARRIER,
+                    Component.text(recipe.getId(), NamedTextColor.RED),
+                    Component.text("Configuration error - check server logs", NamedTextColor.GRAY));
+                inventory.setItem(ACTUAL_RECIPE_SLOTS[slotIndex], errorItem);
             }
         }
 
@@ -321,22 +327,33 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         // Use getDisplayResult() to handle both fixed and dynamic recipes
         RecipeResult displayResult = recipe.getDisplayResult();
 
-        if (displayResult != null) {
-            HItemStack resultStack = plugin.getLibrary().get(displayResult.getItemId())
-                .createStack(1, displayResult.getItemLevel(),
-                            displayResult.getSocketPattern(), displayResult.getRarity());
-
-            if (resultStack != null) {
-                displayItem = resultStack.getBukkitStack().clone();
+        if (displayResult != null && displayResult.getItemId() != null) {
+            var hItem = plugin.getLibrary().get(displayResult.getItemId());
+            if (hItem != null) {
+                HItemStack resultStack = hItem.createStack(1, displayResult.getItemLevel(),
+                                displayResult.getSocketPattern(), displayResult.getRarity());
+                if (resultStack != null) {
+                    displayItem = resultStack.getBukkitStack().clone();
+                } else {
+                    plugin.getLogger().warning("createStack returned null for item '" + displayResult.getItemId() + "' in recipe '" + recipe.getId() + "'");
+                    displayItem = new ItemStack(Material.CRAFTING_TABLE);
+                }
             } else {
-                displayItem = new ItemStack(Material.CRAFTING_TABLE);
+                plugin.getLogger().warning("Item '" + displayResult.getItemId() + "' referenced in recipe '" + recipe.getId() + "' does not exist in the item library");
+                displayItem = new ItemStack(Material.BARRIER);
             }
         } else {
-            displayItem = new ItemStack(Material.CRAFTING_TABLE);
+            plugin.getLogger().warning("Recipe '" + recipe.getId() + "' has no valid display result - check configuration");
+            displayItem = new ItemStack(Material.BARRIER);
         }
 
-        String resultId = (displayResult != null ? displayResult.getItemId() : "unknown").replace(":", ".");
-        displayItem.setData(DataComponentTypes.ITEM_NAME, Component.translatable("hephaestus.item." + resultId + ".name"));
+        if (displayResult != null && displayResult.getItemId() != null) {
+            String resultId = displayResult.getItemId().replace(":", ".");
+            displayItem.setData(DataComponentTypes.ITEM_NAME, Component.translatable("hephaestus.item." + resultId + ".name"));
+        } else {
+            displayItem.setData(DataComponentTypes.ITEM_NAME,
+                Component.text("[Invalid Recipe: " + recipe.getId() + "]", NamedTextColor.RED));
+        }
 
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("Level: " + recipe.getRequiredLevel(), NamedTextColor.YELLOW));
@@ -460,14 +477,18 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
             }
 
             if (result != null) {
-                HItemStack resultStack = plugin.getLibrary().get(result.getItemId())
-                    .createStack(result.getAmount() * craftQuantity, result.getItemLevel(),
+                var hItem = plugin.getLibrary().get(result.getItemId());
+                if (hItem != null) {
+                    HItemStack resultStack = hItem.createStack(result.getAmount() * craftQuantity, result.getItemLevel(),
                                 result.getSocketPattern(), result.getRarity());
 
-                if (resultStack != null) {
-                    ItemStack displayStack = resultStack.getBukkitStack();
-                    displayStack.setAmount(Math.max(1, Math.min(99, result.getAmount() * craftQuantity)));
-                    inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+                    if (resultStack != null) {
+                        ItemStack displayStack = resultStack.getBukkitStack();
+                        displayStack.setAmount(Math.max(1, Math.min(99, result.getAmount() * craftQuantity)));
+                        inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+                    }
+                } else {
+                    plugin.getLogger().warning("Cannot display result: item '" + result.getItemId() + "' not found in library");
                 }
             }
         }
@@ -521,23 +542,35 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         }
 
         if (result != null) {
-            HItemStack resultStack = plugin.getLibrary().get(result.getItemId())
-                .createStack(result.getAmount() * craftQuantity, result.getItemLevel(),
+            var hItem = plugin.getLibrary().get(result.getItemId());
+            if (hItem != null) {
+                HItemStack resultStack = hItem.createStack(result.getAmount() * craftQuantity, result.getItemLevel(),
                             result.getSocketPattern(), result.getRarity());
 
-            if (resultStack != null) {
-                ItemStack displayStack = resultStack.getBukkitStack();
-                displayStack.setAmount(Math.max(1, Math.min(99, result.getAmount() * craftQuantity)));
-                inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+                if (resultStack != null) {
+                    ItemStack displayStack = resultStack.getBukkitStack();
+                    displayStack.setAmount(Math.max(1, Math.min(99, result.getAmount() * craftQuantity)));
+                    inventory.setItem(CRAFT_RESULT_SLOT, displayStack);
+                } else {
+                    inventory.setItem(CRAFT_RESULT_SLOT, new ItemStack(Material.BARRIER));
+                }
+            } else {
+                plugin.getLogger().warning("Cannot display result for recipe '" + recipe.getId() + "': item '" + result.getItemId() + "' not found in library");
+                inventory.setItem(CRAFT_RESULT_SLOT, new ItemStack(Material.BARRIER));
             }
         } else {
-            // No result available (shouldn't happen, but handle gracefully)
+            // No result available - recipe has a configuration error
+            plugin.getLogger().warning("Recipe '" + recipe.getId() + "' has no valid result - check configuration");
             inventory.setItem(CRAFT_RESULT_SLOT, new ItemStack(Material.BARRIER));
         }
 
         updateQuantityDisplay();
         updateCraftButton();
-        GUIUtils.updateTitle(player, Component.text("Crafting: " + getItemDisplayName(recipe.getDisplayResult().getItemId()), NamedTextColor.DARK_GREEN));
+        RecipeResult displayResult = recipe.getDisplayResult();
+        String recipeName = (displayResult != null && displayResult.getItemId() != null)
+            ? getItemDisplayName(displayResult.getItemId())
+            : recipe.getId();
+        GUIUtils.updateTitle(player, Component.text("Crafting: " + recipeName, NamedTextColor.DARK_GREEN));
     }
 
     private void updateCraftButton() {
@@ -678,7 +711,14 @@ public class CraftingStationGUI implements InventoryHolder, Listener {
         RecipeResult calculatedResult = selectedRecipe.calculateResult(ingredients);
 
         if (calculatedResult == null) {
-            player.sendMessage(Component.text("Cannot determine recipe result!", NamedTextColor.RED));
+            plugin.getLogger().warning("Recipe '" + selectedRecipe.getId() + "' has no result - check the recipe configuration (missing 'result' section or invalid resultType)");
+            player.sendMessage(Component.text("This recipe has a configuration error and cannot be crafted. Please report this to an admin.", NamedTextColor.RED));
+            return;
+        }
+
+        if (calculatedResult.getItemId() == null || plugin.getLibrary().get(calculatedResult.getItemId()) == null) {
+            plugin.getLogger().warning("Recipe '" + selectedRecipe.getId() + "' result item '" + calculatedResult.getItemId() + "' does not exist in the item library");
+            player.sendMessage(Component.text("This recipe has a configuration error and cannot be crafted. Please report this to an admin.", NamedTextColor.RED));
             return;
         }
 

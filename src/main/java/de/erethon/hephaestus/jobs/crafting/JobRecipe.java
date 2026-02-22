@@ -377,6 +377,35 @@ public class JobRecipe {
         }
     }
 
+    /**
+     * Validates this recipe's configuration and logs warnings for any issues.
+     * @throws IllegalArgumentException if the recipe is invalid and cannot be used
+     */
+    public void validate() {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("Recipe has no id");
+        }
+        if (jobId == null || jobId.isBlank()) {
+            throw new IllegalArgumentException("Recipe '" + id + "' has no jobId");
+        }
+        if (ingredients.isEmpty()) {
+            de.erethon.hephaestus.Hephaestus.log("Recipe validation warning: recipe '" + id + "' has no ingredients");
+        }
+        if (!hasDynamicResult()) {
+            if (result == null) {
+                throw new IllegalArgumentException("Recipe '" + id + "' has no result defined");
+            }
+            if (result.getItemId() == null || result.getItemId().isBlank()) {
+                throw new IllegalArgumentException("Recipe '" + id + "' has a result with no itemId");
+            }
+        } else {
+            RecipeResult displayResult = getDisplayResult();
+            if (displayResult == null || displayResult.getItemId() == null || displayResult.getItemId().isBlank()) {
+                throw new IllegalArgumentException("Recipe '" + id + "' dynamic result modifier produced no valid display result");
+            }
+        }
+    }
+
     public static JobRecipe deserialize(ConfigurationSection section) {
         String id = section.getString("id");
         String jobId = section.getString("jobId");
@@ -401,10 +430,13 @@ public class JobRecipe {
         String resultType = section.getString("resultType", "fixed");
         if ("dynamic".equals(resultType)) {
             ConfigurationSection modifierSection = section.getConfigurationSection("resultModifier");
-            if (modifierSection != null) {
-                ResultModifier modifier = ResultModifier.deserialize(modifierSection);
-                return new JobRecipe(id, jobId, requiredLevel, ingredients, modifier, baseExperience, craftingTime, minRarity, discoverable);
+            if (modifierSection == null) {
+                throw new IllegalArgumentException("Recipe '" + id + "' is marked as dynamic but has no resultModifier section");
             }
+            ResultModifier modifier = ResultModifier.deserialize(modifierSection);
+            JobRecipe recipe = new JobRecipe(id, jobId, requiredLevel, ingredients, modifier, baseExperience, craftingTime, minRarity, discoverable);
+            recipe.validate();
+            return recipe;
         }
 
         // Default to fixed result
@@ -414,6 +446,8 @@ public class JobRecipe {
             result = RecipeResult.deserialize(resultSection);
         }
 
-        return new JobRecipe(id, jobId, requiredLevel, ingredients, result, baseExperience, craftingTime, minRarity, discoverable);
+        JobRecipe recipe = new JobRecipe(id, jobId, requiredLevel, ingredients, result, baseExperience, craftingTime, minRarity, discoverable);
+        recipe.validate();
+        return recipe;
     }
 }
