@@ -8,6 +8,7 @@ import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
 import de.erethon.hephaestus.jobs.crafting.JobRecipe;
 import de.erethon.hephaestus.jobs.crafting.PlayerCraftingProgress;
 import de.erethon.hephaestus.jobs.crafting.RecipeManager;
+import de.erethon.hephaestus.jobs.crafting.RecipeResult;
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.TooltipDisplay;
 import net.kyori.adventure.text.Component;
