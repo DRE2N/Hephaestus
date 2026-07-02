@@ -270,7 +270,7 @@ public class AuctionHouseManager {
                 });
     }
 
-    private String serializeUpgrades(HItemStack itemStack) {
+    public String serializeUpgrades(HItemStack itemStack) {
         return itemStack.getUpgrades().stream()
                 .map(upgrade -> upgrade.getUpgrade().getId())
                 .sorted()
@@ -278,7 +278,7 @@ public class AuctionHouseManager {
                 .orElse("");
     }
 
-    private byte[] serializeItemStack(HItemStack itemStack) {
+    public byte[] serializeItemStack(HItemStack itemStack) {
         return itemStack.getBukkitStack().serializeAsBytes();
     }
 

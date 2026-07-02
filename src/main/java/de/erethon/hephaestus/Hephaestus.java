@@ -7,6 +7,7 @@ import de.erethon.hephaestus.auctionhouse.AuctionHouseManager;
 import de.erethon.hephaestus.auctionhouse.commands.AuctionHouseCommand;
 import de.erethon.hephaestus.blocks.HBlockLibrary;
 import de.erethon.hephaestus.crafting.VanillaRecipeManager;
+import de.erethon.hephaestus.integration.qxl.HephaestusQXLIntegration;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemLibrary;
 import de.erethon.hephaestus.items.HItemStack;
@@ -20,10 +21,12 @@ import de.erethon.hephaestus.jobs.crafting.commands.CraftingCommand;
 import de.erethon.hephaestus.listeners.CraftingListener;
 import de.erethon.hephaestus.listeners.EquipmentListener;
 import de.erethon.hephaestus.listeners.HListener;
+import de.erethon.hephaestus.listeners.ItemInteractionOverrideListener;
 import de.erethon.hephaestus.shops.ShopDatabaseManager;
 import de.erethon.hephaestus.shops.ShopManager;
 import de.erethon.hephaestus.shops.commands.ShopCommand;
 import de.erethon.hephaestus.translations.TranslationManager;
+import de.erethon.hephaestus.web.WebAuctionHouseServer;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
@@ -55,6 +58,7 @@ public final class Hephaestus extends JavaPlugin {
     private PlayerCraftingProgress playerCraftingProgress;
     private TranslationManager translationManager;
     private VanillaRecipeManager vanillaRecipeManager;
+    private WebAuctionHouseServer webAuctionHouseServer;
 
     public Hephaestus(HItemLibrary itemLibrary) {
         super();
@@ -109,8 +113,14 @@ public final class Hephaestus extends JavaPlugin {
         // Always check for and register missing vanilla items
         generateDefaultItems();
 
+        ItemInteractionOverrideListener interactionOverrideListener = new ItemInteractionOverrideListener(this);
+        Bukkit.getPluginManager().registerEvents(interactionOverrideListener, this);
+        interactionOverrideListener.registerSmeltingRecipes();
+
         // Initialize shop system AFTER items are loaded
         initializeShops();
+
+        initializeWebServer();
 
         // Initialize vanilla crafting system
         File vanillaRecipesFile = new File(getDataFolder(), "vanilla_recipes.yml");
@@ -126,11 +136,16 @@ public final class Hephaestus extends JavaPlugin {
         // Register crafting command
         CraftingCommand craftingCommand = new CraftingCommand("craft");
         Bukkit.getCommandMap().register("jcrafting", craftingCommand);
+
+        registerQuestsXLComponents();
     }
 
     @Override
     public void onDisable() {
         itemLibrary.save();
+        if (webAuctionHouseServer != null) {
+            webAuctionHouseServer.stop();
+        }
         if (jobDatabaseManager != null) {
             jobDatabaseManager.close();
         }
@@ -270,6 +285,35 @@ public final class Hephaestus extends JavaPlugin {
         } catch (Exception e) {
             getLogger().severe("Failed to initialize shop system: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private void initializeWebServer() {
+        try {
+            YamlConfiguration env = YamlConfiguration.loadConfiguration(new File(Bukkit.getWorldContainer(), "environment.yml"));
+            if (!env.getBoolean("webAuctionHouseEnabled", true)) {
+                getLogger().info("Web auction house is disabled.");
+                return;
+            }
+            String host = env.getString("webAuctionHouseHost", "0.0.0.0");
+            int port = env.getInt("webAuctionHousePort", 8080);
+            webAuctionHouseServer = new WebAuctionHouseServer(this, env);
+            webAuctionHouseServer.start(host, port);
+        } catch (Exception e) {
+            getLogger().severe("Failed to initialize web auction house: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void registerQuestsXLComponents() {
+        if (!Bukkit.getPluginManager().isPluginEnabled("QuestsXL")) {
+            return;
+        }
+        try {
+            HephaestusQXLIntegration.register();
+            getLogger().info("Registered Hephaestus components for QuestsXL.");
+        } catch (Throwable throwable) {
+            getLogger().warning("Failed to register QuestsXL components: " + throwable.getMessage());
         }
     }
 

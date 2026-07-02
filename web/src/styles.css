@@ -1,0 +1,57 @@
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #111418;
+}
+
+.topbar {
+  background: #171b20;
+  border-bottom: 1px solid #2c333a;
+}
+
+.loginShell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(120deg, rgba(31, 91, 84, 0.28), transparent 42%),
+    linear-gradient(250deg, rgba(117, 83, 38, 0.22), transparent 48%),
+    #111418;
+}
+
+.loginPanel {
+  width: min(440px, 100%);
+  background: #181d22;
+  border: 1px solid #313941;
+}
+
+.itemGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.itemCard {
+  background: #171d22;
+  border: 1px solid #303941;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.itemCard:hover {
+  border-color: #2f9e8f;
+  transform: translateY(-1px);
+}
+
+.itemIcon {
+  width: 42px;
+  height: 42px;
+  image-rendering: pixelated;
+  flex: 0 0 42px;
+}

@@ -14,6 +14,7 @@ import de.erethon.hephaestus.items.interactions.HItemDropAction;
 import de.erethon.hephaestus.items.interactions.HItemEquipAction;
 import de.erethon.hephaestus.items.interactions.HItemInteractAction;
 import de.erethon.hephaestus.items.interactions.HItemUnequipAction;
+import de.erethon.hephaestus.items.interactions.ItemInteractionSettings;
 import de.erethon.hephaestus.items.orbs.OrbColor;
 import de.erethon.hephaestus.utils.HRandom;
 import de.erethon.spellbook.api.SpellData;
@@ -55,6 +56,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public class HItem {
@@ -97,6 +99,7 @@ public class HItem {
     private final Set<HItemEquipAction> equipActions = new HashSet<>();
     private final Set<HItemUnequipAction> unequipActions = new HashSet<>();
     private final Set<HItemDropAction> dropActions = new HashSet<>();
+    private ItemInteractionSettings interactionSettings = new ItemInteractionSettings(null, null);
 
     // Spells (mostly used for Jobs right now)
     private final Set<SpellData> rightClickSpells = new HashSet<>();
@@ -271,11 +274,16 @@ public class HItem {
         hStack.update();
         hStack.setItemLevel(level);
         hStack.setRarity(rarity);
-        if (socketPattern != null && !socketPattern.isBlank()) {
-            hStack.applySocketPattern(socketPattern);
-            hStack.setMaxUpgrades(hStack.getSockets().size());
+        if (socketPattern != null) {
+            if (!socketPattern.isBlank()) {
+                hStack.applySocketPattern(socketPattern);
+                hStack.setMaxUpgrades(hStack.getSockets().size());
+            }
+        } else {
+            applyRandomSocketPattern(hStack, level);
         }
         hStack.getVanillaStack().setCount(amount);
+        hStack.updateVisuals();
         return hStack;
     }
 
@@ -495,8 +503,39 @@ public class HItem {
         return itemModel;
     }
 
+    public Identifier getBaseItemKey() {
+        return BuiltInRegistries.ITEM.getKey(baseItem);
+    }
+
+    public Identifier getEffectiveItemModel() {
+        if (itemModel != null) {
+            return itemModel;
+        }
+        Identifier patchItemModel = getPatchItemModel();
+        return patchItemModel != null ? patchItemModel : getBaseItemKey();
+    }
+
+    private Identifier getPatchItemModel() {
+        if (patch == null || patch == DataComponentPatch.EMPTY) {
+            return null;
+        }
+        for (Map.Entry<DataComponentType<?>, Optional<?>> entry : patch.entrySet()) {
+            if (entry.getKey() == DataComponents.ITEM_MODEL && entry.getValue().isPresent()) {
+                Object value = entry.getValue().get();
+                if (value instanceof Identifier identifier) {
+                    return identifier;
+                }
+            }
+        }
+        return null;
+    }
+
     public HItemLibrary getLibrary() {
         return library;
+    }
+
+    public ItemInteractionSettings getInteractionSettings() {
+        return interactionSettings;
     }
 
     public Hephaestus getPlugin() {
@@ -763,6 +802,9 @@ public class HItem {
                 }
             }
             plugin.getLogger().info("Loaded " + rightClickSpells.size() + " right-click spells for item " + key);
+        }
+        if (config.contains("interactions")) {
+            interactionSettings = ItemInteractionSettings.deserialize(config.getConfigurationSection("interactions"));
         }
         if (patch == null) {
             patch = DataComponentPatch.EMPTY;

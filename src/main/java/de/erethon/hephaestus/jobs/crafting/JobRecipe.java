@@ -1,7 +1,6 @@
 package de.erethon.hephaestus.jobs.crafting;
 
-import de.erethon.hephaestus.items.HItem;
-import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.items.HItemUtil;
 import de.erethon.hephaestus.items.HRarity;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
@@ -16,6 +15,7 @@ import java.util.HashSet;
 public class JobRecipe {
 
     private final String id;
+    private final String displayName;
     private final String jobId;
     private final int requiredLevel;
     private final List<RecipeIngredient> ingredients;
@@ -27,9 +27,10 @@ public class JobRecipe {
     private final boolean discoverable;
 
     // Constructor with fixed result
-    public JobRecipe(String id, String jobId, int requiredLevel, List<RecipeIngredient> ingredients,
+    public JobRecipe(String id, String displayName, String jobId, int requiredLevel, List<RecipeIngredient> ingredients,
                      RecipeResult result, long baseExperience, int craftingTime, HRarity minRarity, boolean discoverable) {
         this.id = id;
+        this.displayName = displayName == null || displayName.isBlank() ? id : displayName;
         this.jobId = jobId;
         this.requiredLevel = requiredLevel;
         this.ingredients = new ArrayList<>(ingredients);
@@ -42,9 +43,10 @@ public class JobRecipe {
     }
 
     // Constructor with dynamic result modifier
-    public JobRecipe(String id, String jobId, int requiredLevel, List<RecipeIngredient> ingredients,
+    public JobRecipe(String id, String displayName, String jobId, int requiredLevel, List<RecipeIngredient> ingredients,
                      ResultModifier resultModifier, long baseExperience, int craftingTime, HRarity minRarity, boolean discoverable) {
         this.id = id;
+        this.displayName = displayName == null || displayName.isBlank() ? id : displayName;
         this.jobId = jobId;
         this.requiredLevel = requiredLevel;
         this.ingredients = new ArrayList<>(ingredients);
@@ -58,6 +60,10 @@ public class JobRecipe {
 
     public String getId() {
         return id;
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 
     public String getJobId() {
@@ -105,13 +111,10 @@ public class JobRecipe {
                 for (ItemStack stack : providedIngredients) {
                     if (stack == null || stack.getType().isAir()) continue;
 
-                    HItemStack hStack = HItemStack.getFromStack(stack);
-                    if (hStack != null) {
-                        String itemId = hStack.getItem().getKey().toString();
-                        if (ingredient.matches(itemId)) {
-                            int tier = ingredient.getTierForItem(itemId);
-                            determinedTier = Math.max(determinedTier, tier);
-                        }
+                    String itemId = HItemUtil.getItemId(stack);
+                    if (itemId != null && ingredient.matches(itemId)) {
+                        int tier = ingredient.getTierForItem(itemId);
+                        determinedTier = Math.max(determinedTier, tier);
                     }
                 }
             }
@@ -173,9 +176,6 @@ public class JobRecipe {
     public boolean matchesIngredientsForDiscovery(List<ItemStack> providedIngredients) {
         if (ingredients.isEmpty()) return false;
 
-        de.erethon.hephaestus.Hephaestus.log("      Checking discovery match for recipe: " + id);
-        de.erethon.hephaestus.Hephaestus.log("      Recipe has " + ingredients.size() + " ingredient(s)");
-
         // Get unique ingredient types from the recipe (ignoring amounts)
         Set<String> recipeIngredientTypes = new HashSet<>();
         for (RecipeIngredient recipeIngredient : ingredients) {
@@ -192,10 +192,8 @@ public class JobRecipe {
         for (ItemStack provided : providedIngredients) {
             if (provided == null || provided.getType().isAir()) continue;
 
-            HItemStack hStack = HItemStack.getFromStack(provided);
-            if (hStack != null) {
-                String itemId = hStack.getItem().getKey().toString();
-                de.erethon.hephaestus.Hephaestus.log("          Provided item: " + itemId);
+            String itemId = HItemUtil.getItemId(provided);
+            if (itemId != null) {
 
                 // Check if this item matches any recipe ingredient (including choices)
                 boolean matched = false;
@@ -212,21 +210,13 @@ public class JobRecipe {
                 }
 
                 if (!matched) {
-                    de.erethon.hephaestus.Hephaestus.log("          -> Provided item doesn't match any recipe ingredient");
                     return false; // Provided an item that's not in the recipe
                 }
-            } else {
-                de.erethon.hephaestus.Hephaestus.log("          Skipping vanilla item: " + provided.getType());
             }
         }
 
         // Check if the sets match exactly
-        boolean exactMatch = recipeIngredientTypes.equals(providedIngredientTypes);
-        de.erethon.hephaestus.Hephaestus.log("      Recipe types: " + recipeIngredientTypes);
-        de.erethon.hephaestus.Hephaestus.log("      Provided types: " + providedIngredientTypes);
-        de.erethon.hephaestus.Hephaestus.log("      Exact match: " + exactMatch);
-
-        return exactMatch;
+        return recipeIngredientTypes.equals(providedIngredientTypes);
     }
 
     /**
@@ -251,9 +241,8 @@ public class JobRecipe {
         for (ItemStack stack : providedIngredients) {
             if (stack == null || stack.getType().isAir()) continue;
 
-            HItemStack hStack = HItemStack.getFromStack(stack);
-            if (hStack != null) {
-                String itemId = hStack.getItem().getKey().toString();
+            String itemId = HItemUtil.getItemId(stack);
+            if (itemId != null) {
 
                 // Try to match with each recipe ingredient
                 for (RecipeIngredient ingredient : ingredients) {
@@ -286,9 +275,8 @@ public class JobRecipe {
         for (ItemStack stack : providedIngredients) {
             if (stack == null || stack.getType().isAir()) continue;
 
-            HItemStack hStack = HItemStack.getFromStack(stack);
-            if (hStack != null) {
-                String itemId = hStack.getItem().getKey().toString();
+            String itemId = HItemUtil.getItemId(stack);
+            if (itemId != null) {
 
                 // Try to match with each recipe ingredient
                 for (RecipeIngredient ingredient : ingredients) {
@@ -326,9 +314,8 @@ public class JobRecipe {
         for (ItemStack stack : providedIngredients) {
             if (stack == null || stack.getType().isAir()) continue;
 
-            HItemStack hStack = HItemStack.getFromStack(stack);
-            if (hStack != null) {
-                String itemId = hStack.getItem().getKey().toString();
+            String itemId = HItemUtil.getItemId(stack);
+            if (itemId != null) {
 
                 // Try to match with each recipe ingredient
                 for (RecipeIngredient ingredient : ingredients) {
@@ -352,6 +339,7 @@ public class JobRecipe {
 
     public void serialize(ConfigurationSection section) {
         section.set("id", id);
+        section.set("displayName", displayName);
         section.set("jobId", jobId);
         section.set("requiredLevel", requiredLevel);
         section.set("baseExperience", baseExperience);
@@ -406,8 +394,9 @@ public class JobRecipe {
         }
     }
 
-    public static JobRecipe deserialize(ConfigurationSection section) {
-        String id = section.getString("id");
+    public static JobRecipe deserialize(String canonicalId, ConfigurationSection section) {
+        String id = canonicalId == null || canonicalId.isBlank() ? section.getName() : canonicalId;
+        String displayName = section.getString("displayName", section.getString("id", id));
         String jobId = section.getString("jobId");
         int requiredLevel = section.getInt("requiredLevel");
         long baseExperience = section.getLong("baseExperience");
@@ -428,13 +417,13 @@ public class JobRecipe {
 
         // Deserialize result or result modifier
         String resultType = section.getString("resultType", "fixed");
-        if ("dynamic".equals(resultType)) {
-            ConfigurationSection modifierSection = section.getConfigurationSection("resultModifier");
+        ConfigurationSection modifierSection = section.getConfigurationSection("resultModifier");
+        if ("dynamic".equals(resultType) || modifierSection != null) {
             if (modifierSection == null) {
                 throw new IllegalArgumentException("Recipe '" + id + "' is marked as dynamic but has no resultModifier section");
             }
             ResultModifier modifier = ResultModifier.deserialize(modifierSection);
-            JobRecipe recipe = new JobRecipe(id, jobId, requiredLevel, ingredients, modifier, baseExperience, craftingTime, minRarity, discoverable);
+            JobRecipe recipe = new JobRecipe(id, displayName, jobId, requiredLevel, ingredients, modifier, baseExperience, craftingTime, minRarity, discoverable);
             recipe.validate();
             return recipe;
         }
@@ -446,8 +435,12 @@ public class JobRecipe {
             result = RecipeResult.deserialize(resultSection);
         }
 
-        JobRecipe recipe = new JobRecipe(id, jobId, requiredLevel, ingredients, result, baseExperience, craftingTime, minRarity, discoverable);
+        JobRecipe recipe = new JobRecipe(id, displayName, jobId, requiredLevel, ingredients, result, baseExperience, craftingTime, minRarity, discoverable);
         recipe.validate();
         return recipe;
+    }
+
+    public static JobRecipe deserialize(ConfigurationSection section) {
+        return deserialize(section.getName(), section);
     }
 }

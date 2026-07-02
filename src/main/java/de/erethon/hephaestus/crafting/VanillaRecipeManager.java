@@ -3,6 +3,7 @@ package de.erethon.hephaestus.crafting;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.items.HItemUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -15,7 +16,6 @@ import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.ShapelessRecipe;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -104,7 +104,11 @@ public class VanillaRecipeManager {
         // Set the shape
         List<String> pattern = vanillaRecipe.getPattern();
         if (pattern == null || pattern.isEmpty()) {
+            plugin.getLogger().warning("Malformed shaped pattern in recipe " + vanillaRecipe.getId() + ": pattern is empty");
             return null;
+        }
+        if (pattern.size() > 3) {
+            plugin.getLogger().warning("Malformed shaped pattern in recipe " + vanillaRecipe.getId() + ": more than 3 rows");
         }
 
         String[] shapeArray = new String[Math.min(3, pattern.size())];
@@ -112,6 +116,7 @@ public class VanillaRecipeManager {
             String row = pattern.get(i);
             // Ensure the row is exactly 3 characters
             if (row.length() > 3) {
+                plugin.getLogger().warning("Malformed shaped pattern row in recipe " + vanillaRecipe.getId() + ": '" + row + "' is longer than 3 characters");
                 row = row.substring(0, 3);
             } else if (row.length() < 3) {
                 row = String.format("%-3s", row); // Pad with spaces
@@ -133,6 +138,8 @@ public class VanillaRecipeManager {
                 RecipeChoice ingredient = createRecipeChoice(itemId);
                 if (ingredient != null) {
                     shapedRecipe.setIngredient(key, ingredient);
+                } else {
+                    plugin.getLogger().warning("Unknown shaped ingredient '" + itemId + "' in recipe " + vanillaRecipe.getId());
                 }
             }
         }
@@ -156,6 +163,8 @@ public class VanillaRecipeManager {
                 RecipeChoice ingredient = createRecipeChoice(itemId);
                 if (ingredient != null) {
                     shapelessRecipe.addIngredient(ingredient);
+                } else {
+                    plugin.getLogger().warning("Unknown shapeless ingredient '" + itemId + "' in recipe " + vanillaRecipe.getId());
                 }
             }
         }
@@ -166,6 +175,7 @@ public class VanillaRecipeManager {
     private ItemStack createBaseResultItem(VanillaRecipe vanillaRecipe) {
         String resultItemId = vanillaRecipe.getResultItemId();
         if (resultItemId == null) {
+            plugin.getLogger().warning("Vanilla recipe " + vanillaRecipe.getId() + " has no result item");
             return null;
         }
 
@@ -178,53 +188,32 @@ public class VanillaRecipeManager {
         }
 
         // Fall back to vanilla item
-        return createVanillaItem(resultItemId, vanillaRecipe.getResult().getAmount());
+        ItemStack vanillaResult = createVanillaItem(resultItemId, vanillaRecipe.getResult().getAmount());
+        if (vanillaResult == null || vanillaResult.getType().isAir()) {
+            plugin.getLogger().warning("Unknown result item '" + resultItemId + "' in vanilla recipe " + vanillaRecipe.getId());
+            return null;
+        }
+        return vanillaResult;
     }
 
     private RecipeChoice createRecipeChoice(String itemId) {
         // Try HItem first
         HItem hItem = Hephaestus.getItem(itemId);
-        if (hItem != null) {
-            net.minecraft.world.item.Item nmsItem = hItem.getBaseItem();
-            net.minecraft.resources.Identifier itemKey = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(nmsItem);
-
-            try {
-                // Convert minecraft:stone -> STONE
-                String materialName = itemKey.getPath().toUpperCase().replace("_", "_");
-                Material material = Material.getMaterial(materialName);
-                if (material != null) {
-                    return new RecipeChoice.MaterialChoice(material);
-                }
-            } catch (Exception e) {
-                plugin.getLogger().warning("Failed to convert HItem to Material for recipe choice: " + itemId + " -> " + itemKey);
-            }
+        if (hItem != null && !hItem.isVanilla()) {
+            return new RecipeChoice.ExactChoice(hItem.createStack().getBukkitStack());
         }
 
         // Try vanilla material
-        ItemStack vanillaItem = createVanillaItem(itemId, 1);
-        if (vanillaItem != null) {
-            return new RecipeChoice.MaterialChoice(vanillaItem.getType());
+        Material material = HItemUtil.materialFromId(itemId);
+        if (material != null && !material.isAir()) {
+            return new RecipeChoice.MaterialChoice(material);
         }
 
         return null;
     }
 
     private ItemStack createVanillaItem(String itemId, int amount) {
-        try {
-            // Handle minecraft: prefix
-            if (itemId.startsWith("minecraft:")) {
-                itemId = itemId.substring(10); // Remove "minecraft:" prefix
-            }
-
-            Material material = Material.getMaterial(itemId.toUpperCase());
-            if (material != null) {
-                return new ItemStack(material, amount);
-            }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to create vanilla item for " + itemId + ": " + e.getMessage());
-        }
-
-        return null;
+        return HItemUtil.createItemStack(itemId, amount);
     }
 
     private void clearRegisteredRecipes() {
@@ -290,12 +279,9 @@ public class VanillaRecipeManager {
         if (requiredHStack != null && actualHStack != null) {
             // Both are HItems - compare the base HItem types
             return requiredHStack.getItem().getKey().equals(actualHStack.getItem().getKey());
-        } else if (requiredHStack == null && actualHStack == null) {
-            // Both are vanilla items - simple material comparison
-            return required.getType() == actual.getType();
-        } else {
-            // One is HItem, one is vanilla - no match
-            return false;
         }
+        String requiredId = HItemUtil.getItemId(required);
+        String actualId = HItemUtil.getItemId(actual);
+        return requiredId != null && requiredId.equals(actualId);
     }
 }

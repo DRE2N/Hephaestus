@@ -1,5 +1,5 @@
 name: Hephaestus
-version: 1.0
+version: 26.1
 main: de.erethon.hephaestus.Hephaestus
 api-version: '1.21'
 bootstrapper: de.erethon.hephaestus.HephaestusBootstrap
@@ -8,4 +8,12 @@ dependencies:
     Hecate:
       load: BEFORE
       required: true
+      join-classpath: true
+    QuestsXL:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    Tyche:
+      load: BEFORE
+      required: false
       join-classpath: true

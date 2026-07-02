@@ -17,6 +17,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -147,14 +148,19 @@ public class HListener implements Listener {
             if (blockType == Material.BEDROCK) {
                 return; // Bedrock is used as a placeholder for "no crafting block" in jobs, so ignore it
             }
+            boolean isCraftingBlock = Hephaestus.INSTANCE.getJobManager().getAllJobs().stream()
+                    .anyMatch(job -> job.getCraftingBlock() == blockType);
+            if (!isCraftingBlock) {
+                return;
+            }
             HCharacter character = JobCharacterBridgeUtil.getCharacter(event.getPlayer());
             if (character != null) {
+                event.setCancelled(true);
+                Player player = event.getPlayer();
                 Hephaestus.INSTANCE.getJobManager().getCharacterJob(character.getCharacterID()).thenAccept(job -> {
-                    if (job != null) {
-                        if (job.getCraftingBlock() == blockType) {
-                            event.setCancelled(true);
-                            new CraftingStationGUI(Hephaestus.INSTANCE, event.getPlayer()).open();
-                        }
+                    if (job != null && job.getCraftingBlock() == blockType) {
+                        Bukkit.getScheduler().runTask(Hephaestus.INSTANCE,
+                                () -> new CraftingStationGUI(Hephaestus.INSTANCE, player).open());
                     }
                 });
             }

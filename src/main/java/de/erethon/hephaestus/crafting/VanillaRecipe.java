@@ -3,8 +3,7 @@ package de.erethon.hephaestus.crafting;
 import de.erethon.hephaestus.Hephaestus;
 import de.erethon.hephaestus.items.HItem;
 import de.erethon.hephaestus.items.HItemStack;
-import net.minecraft.resources.Identifier;
-import org.bukkit.Material;
+import de.erethon.hephaestus.items.HItemUtil;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.inventory.ItemStack;
 
@@ -136,30 +135,11 @@ public class VanillaRecipe {
     }
 
     private static ItemStack createItemStack(String itemId, int amount) {
-        // Try to get as HItem first
-        HItem hItem = Hephaestus.getItem(itemId);
-        if (hItem != null) {
-            return hItem.createStack(amount).getBukkitStack();
+        ItemStack stack = HItemUtil.createItemStack(itemId, amount);
+        if (stack == null) {
+            throw new IllegalArgumentException("Unknown item: " + itemId);
         }
-
-        // Fall back to vanilla material
-        try {
-            Identifier location = Identifier.parse(itemId);
-            if (location.getNamespace().equals("minecraft")) {
-                Material material = Material.getMaterial(location.getPath().toUpperCase());
-                if (material != null) {
-                    return new ItemStack(material, amount);
-                }
-            }
-        } catch (Exception e) {
-            // Invalid resource location format, try direct material lookup
-            Material material = Material.getMaterial(itemId.toUpperCase());
-            if (material != null) {
-                return new ItemStack(material, amount);
-            }
-        }
-
-        throw new IllegalArgumentException("Unknown item: " + itemId);
+        return stack;
     }
 
     /**
@@ -236,7 +216,7 @@ public class VanillaRecipe {
 
                 if (patternChar.equals(" ")) {
                     // Empty slot required
-                    if (actualItem != null && actualItem.getType() != Material.AIR) {
+                    if (actualItem != null && !actualItem.getType().isAir()) {
                         return null;
                     }
                 } else {
@@ -271,7 +251,7 @@ public class VanillaRecipe {
         // Count actual ingredients
         Map<String, Integer> actualCounts = new HashMap<>();
         for (ItemStack item : matrix) {
-            if (item == null || item.getType() == Material.AIR) {
+            if (item == null || item.getType().isAir()) {
                 continue;
             }
 

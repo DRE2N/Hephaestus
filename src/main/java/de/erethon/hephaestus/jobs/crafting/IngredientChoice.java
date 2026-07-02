@@ -47,11 +47,8 @@ public class IngredientChoice {
      * @return true if any option matches
      */
     public boolean containsItem(String itemId) {
-        de.erethon.hephaestus.Hephaestus.log("              Choice '" + choiceId + "' has " + options.size() + " options");
         for (IngredientOption option : options) {
-            de.erethon.hephaestus.Hephaestus.log("                Option: " + option.getItemId() + " (tier " + option.getTier() + ")");
             if (option.getItemId().equals(itemId)) {
-                de.erethon.hephaestus.Hephaestus.log("                  -> MATCH!");
                 return true;
             }
         }

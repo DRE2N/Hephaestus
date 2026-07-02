@@ -2,18 +2,19 @@ package de.erethon.hephaestus.translations;
 
 import de.erethon.hephaestus.Hephaestus;
 import net.kyori.adventure.key.Key;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.translation.GlobalTranslator;
 import net.kyori.adventure.translation.TranslationRegistry;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 public class TranslationManager {
@@ -38,15 +39,19 @@ public class TranslationManager {
     }
 
     private void loadTranslations() {
-        loadTranslationFile("translations_en.yml", Locale.US);
-        loadTranslationFile("translations_de.yml", Locale.GERMANY);
+        loadTranslationFile("english.yml", "translations_en.yml", Locale.US);
+        loadTranslationFile("german.yml", "translations_de.yml", Locale.GERMANY);
 
         plugin.getLogger().info("Loaded translations for supported locales");
     }
 
-    private void loadTranslationFile(String fileName, Locale locale) {
+    private void loadTranslationFile(String fileName, String legacyFileName, Locale locale) {
         File dataFolder = plugin.getDataFolder();
+        if (!dataFolder.exists()) {
+            dataFolder.mkdirs();
+        }
         File translationFile = new File(dataFolder, fileName);
+        migrateLegacyTranslationFile(translationFile, new File(dataFolder, legacyFileName));
 
         YamlConfiguration config;
         if (!translationFile.exists()) {
@@ -66,6 +71,22 @@ public class TranslationManager {
         registerTranslationsFromConfig(config, "", locale);
 
         plugin.getLogger().info("Loaded " + fileName + " for locale " + locale.toString());
+    }
+
+    private void migrateLegacyTranslationFile(File translationFile, File legacyTranslationFile) {
+        if (translationFile.exists() || !legacyTranslationFile.exists()) {
+            return;
+        }
+        try {
+            Files.copy(
+                    legacyTranslationFile.toPath(),
+                    translationFile.toPath(),
+                    StandardCopyOption.COPY_ATTRIBUTES
+            );
+            plugin.getLogger().info("Migrated legacy translation file " + legacyTranslationFile.getName() + " to " + translationFile.getName());
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to migrate legacy translation file " + legacyTranslationFile.getName() + ": " + e.getMessage());
+        }
     }
 
     private void registerTranslationsFromConfig(YamlConfiguration config, String prefix, Locale locale) {

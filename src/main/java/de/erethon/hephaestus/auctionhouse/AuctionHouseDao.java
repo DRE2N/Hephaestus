@@ -254,9 +254,11 @@ public interface AuctionHouseDao {
     void addCollectableMoney(@Bind("playerUuid") UUID playerUuid, @Bind("amount") long amount);
 
     @SqlQuery("""
-        SELECT COALESCE(amount, 0)
-        FROM ah_collectable_money
-        WHERE player_uuid = :playerUuid
+        SELECT COALESCE((
+            SELECT amount
+            FROM ah_collectable_money
+            WHERE player_uuid = :playerUuid
+        ), 0)
         """)
     long getCollectableMoney(@Bind("playerUuid") UUID playerUuid);
 

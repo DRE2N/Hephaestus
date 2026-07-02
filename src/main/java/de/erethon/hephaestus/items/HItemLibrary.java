@@ -89,6 +89,10 @@ public class HItemLibrary {
         return new ArrayList<>(items.keySet());
     }
 
+    public List<HItem> getItems() {
+        return new ArrayList<>(items.values());
+    }
+
     // Upgrades
 
     public HItemUpgrade getUpgrade(String id) {

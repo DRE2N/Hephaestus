@@ -1,6 +1,7 @@
 package de.erethon.hephaestus.jobs.crafting;
 
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.inventory.ItemStack;
 
 public class RecipeIngredient {
 
@@ -67,13 +68,13 @@ public class RecipeIngredient {
      */
     public boolean matches(String itemId) {
         if (isChoice()) {
-            boolean result = choice.containsItem(itemId);
-            de.erethon.hephaestus.Hephaestus.log("            Choice ingredient '" + choice.getChoiceId() + "' checking '" + itemId + "': " + result);
-            return result;
+            return choice.containsItem(itemId);
         }
-        boolean result = this.itemId != null && this.itemId.equals(itemId);
-        de.erethon.hephaestus.Hephaestus.log("            Fixed ingredient '" + this.itemId + "' checking '" + itemId + "': " + result);
-        return result;
+        return this.itemId != null && this.itemId.equals(itemId);
+    }
+
+    public boolean matches(ItemStack stack) {
+        return matches(de.erethon.hephaestus.items.HItemUtil.getItemId(stack));
     }
 
     /**

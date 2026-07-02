@@ -2,7 +2,7 @@ package de.erethon.hephaestus.jobs.crafting.gui;
 
 import de.erethon.hecate.data.HCharacter;
 import de.erethon.hephaestus.Hephaestus;
-import de.erethon.hephaestus.items.HItemStack;
+import de.erethon.hephaestus.items.HItemUtil;
 import de.erethon.hephaestus.jobs.CharacterJob;
 import de.erethon.hephaestus.jobs.JobCharacterBridgeUtil;
 import de.erethon.hephaestus.jobs.crafting.JobRecipe;
@@ -27,6 +27,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
 
@@ -172,9 +173,8 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
         for (int i = 0; i < ingredients.size(); i++) {
             ItemStack stack = ingredients.get(i);
             plugin.getLogger().info("  Ingredient " + i + ": " + stack.getType() + " x" + stack.getAmount());
-            HItemStack hStack = HItemStack.getFromStack(stack);
-            if (hStack != null) {
-                String itemId = hStack.getItem().getKey().toString();
+            String itemId = HItemUtil.getItemId(stack);
+            if (itemId != null) {
                 plugin.getLogger().info("    -> HItemStack ID: " + itemId);
             } else {
                 plugin.getLogger().info("    -> Not an HItemStack (vanilla item)");
@@ -183,7 +183,7 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
 
         JobCharacterBridgeUtil.getCharacterJobRecord(player).thenAccept(characterJob -> {
             if (characterJob == null) {
-                player.sendMessage(Component.text("You need a job to discover recipes!", NamedTextColor.RED));
+                runSync(() -> player.sendMessage(Component.text("You need a job to discover recipes!", NamedTextColor.RED)));
                 return;
             }
 
@@ -195,8 +195,10 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
 
             if (discoveredRecipes.isEmpty()) {
                 plugin.getLogger().info("No recipes discovered with these ingredients.");
-                player.sendMessage(Component.text("No recipe discovered with these ingredients.", NamedTextColor.YELLOW));
-                setResultSlot(null);
+                runSync(() -> {
+                    player.sendMessage(Component.text("No recipe discovered with these ingredients.", NamedTextColor.YELLOW));
+                    setResultSlot(null);
+                });
                 return;
             }
 
@@ -210,44 +212,37 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
     }
 
     private void processMultipleRecipeDiscoveries(HCharacter character, CharacterJob characterJob, List<JobRecipe> recipes) {
-        List<JobRecipe> newlyDiscovered = new ArrayList<>();
-        List<JobRecipe> alreadyKnown = new ArrayList<>();
-        List<JobRecipe> levelTooLow = new ArrayList<>();
+        CompletableFuture<Integer> levelFuture = JobCharacterBridgeUtil.getJobLevel(characterJob);
+        List<CompletableFuture<DiscoveryState>> stateFutures = recipes.stream()
+                .map(recipe -> progressManager.hasDiscoveredRecipe(character.getCharacterID(), recipe.getId())
+                        .thenCombine(levelFuture, (alreadyDiscovered, level) -> new DiscoveryState(recipe, alreadyDiscovered, level)))
+                .toList();
 
-        // First, categorize all recipes
-        int[] processedCount = {0};
-        for (JobRecipe recipe : recipes) {
-            progressManager.hasDiscoveredRecipe(character.getCharacterID(), recipe.getId())
-                .thenAccept(alreadyDiscovered -> {
-                    if (alreadyDiscovered) {
-                        alreadyKnown.add(recipe);
-                    } else {
-                        JobCharacterBridgeUtil.getJobLevel(characterJob).thenAccept(level -> {
-                            if (level < recipe.getRequiredLevel()) {
-                                levelTooLow.add(recipe);
-                            } else {
-                                newlyDiscovered.add(recipe);
-                            }
+        CompletableFuture.allOf(stateFutures.toArray(CompletableFuture[]::new)).thenRun(() -> {
+            List<JobRecipe> newlyDiscovered = new ArrayList<>();
+            List<JobRecipe> alreadyKnown = new ArrayList<>();
+            List<JobRecipe> levelTooLow = new ArrayList<>();
 
-                            processedCount[0]++;
+            for (CompletableFuture<DiscoveryState> future : stateFutures) {
+                DiscoveryState state = future.join();
+                if (state.alreadyDiscovered()) {
+                    alreadyKnown.add(state.recipe());
+                } else if (state.level() < state.recipe().getRequiredLevel()) {
+                    levelTooLow.add(state.recipe());
+                } else {
+                    newlyDiscovered.add(state.recipe());
+                }
+            }
 
-                            // Once all recipes are processed, handle the results
-                            if (processedCount[0] == recipes.size()) {
-                                handleDiscoveryResults(character, characterJob, newlyDiscovered, alreadyKnown, levelTooLow);
-                            }
-                        });
-                    }
+            CompletableFuture<?>[] discoverFutures = newlyDiscovered.stream()
+                    .map(recipe -> progressManager.discoverRecipe(character.getCharacterID(), recipe.getId()))
+                    .toArray(CompletableFuture[]::new);
+            CompletableFuture.allOf(discoverFutures)
+                    .thenRun(() -> runSync(() -> handleDiscoveryResults(character, characterJob, newlyDiscovered, alreadyKnown, levelTooLow)));
+        });
+    }
 
-                    if (alreadyDiscovered) {
-                        processedCount[0]++;
-
-                        // Once all recipes are processed, handle the results
-                        if (processedCount[0] == recipes.size()) {
-                            handleDiscoveryResults(character, characterJob, newlyDiscovered, alreadyKnown, levelTooLow);
-                        }
-                    }
-                });
-        }
+    private record DiscoveryState(JobRecipe recipe, boolean alreadyDiscovered, int level) {
     }
 
     private void handleDiscoveryResults(HCharacter character, CharacterJob characterJob,
@@ -257,7 +252,6 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
         // Discover all new recipes
         long totalXp = 0;
         for (JobRecipe recipe : newlyDiscovered) {
-            progressManager.discoverRecipe(character.getCharacterID(), recipe.getId());
             long discoveryXp = recipe.getBaseExperience() / 4;
             totalXp += discoveryXp;
         }
@@ -265,11 +259,11 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
         // Send feedback to player
         if (!newlyDiscovered.isEmpty()) {
             if (newlyDiscovered.size() == 1) {
-                player.sendMessage(Component.text("Recipe discovered: " + newlyDiscovered.get(0).getId(), NamedTextColor.GREEN));
+                player.sendMessage(Component.text("Recipe discovered: " + newlyDiscovered.get(0).getDisplayName(), NamedTextColor.GREEN));
             } else {
                 player.sendMessage(Component.text("Discovered " + newlyDiscovered.size() + " recipes:", NamedTextColor.GREEN));
                 for (JobRecipe recipe : newlyDiscovered) {
-                    player.sendMessage(Component.text("  - " + recipe.getId(), NamedTextColor.GREEN));
+                    player.sendMessage(Component.text("  - " + recipe.getDisplayName(), NamedTextColor.GREEN));
                 }
             }
 
@@ -312,20 +306,13 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
             setResultSlot(null);
             return;
         }
-        var hItem = plugin.getLibrary().get(recipeResult.getItemId());
-        if (hItem == null) {
-            plugin.getLogger().warning("Recipe '" + recipe.getId() + "' result item '" + recipeResult.getItemId() + "' does not exist in the item library");
+        ItemStack resultStack = HItemUtil.createItemStack(recipeResult.getItemId(), recipeResult.getAmount());
+        if (resultStack == null || resultStack.getType().isAir()) {
+            plugin.getLogger().warning("Recipe '" + recipe.getId() + "' result item '" + recipeResult.getItemId() + "' cannot be created");
             setResultSlot(null);
             return;
         }
-        HItemStack resultStack = hItem.createStack(recipeResult.getAmount(), recipeResult.getItemLevel(),
-                    recipeResult.getSocketPattern(), recipeResult.getRarity());
-
-        if (resultStack != null) {
-            setResultSlot(resultStack.getBukkitStack());
-        } else {
-            setResultSlot(null);
-        }
+        setResultSlot(resultStack);
     }
 
     private void setResultSlot(ItemStack item) {
@@ -392,5 +379,13 @@ public class RecipeDiscoveryGUI implements InventoryHolder, Listener {
 
     public void open() {
         player.openInventory(inventory);
+    }
+
+    private void runSync(Runnable runnable) {
+        if (Bukkit.isPrimaryThread()) {
+            runnable.run();
+        } else {
+            Bukkit.getScheduler().runTask(plugin, runnable);
+        }
     }
 }

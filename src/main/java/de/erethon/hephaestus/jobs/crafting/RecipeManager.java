@@ -100,7 +100,7 @@ public class RecipeManager {
                 ConfigurationSection recipeSection = recipesSection.getConfigurationSection(key);
                 if (recipeSection != null) {
                     try {
-                        JobRecipe recipe = JobRecipe.deserialize(recipeSection);
+                        JobRecipe recipe = JobRecipe.deserialize(key, recipeSection);
 
                         // Check for duplicate recipe IDs
                         if (recipes.containsKey(recipe.getId())) {
@@ -190,28 +190,20 @@ public class RecipeManager {
             return null;
         }
 
-        Hephaestus.log("Checking " + jobRecipeIds.size() + " recipes for job '" + jobId + "'");
-
         // First try to find recipes that match ingredients for discovery
         for (String recipeId : jobRecipeIds) {
             JobRecipe recipe = recipes.get(recipeId);
             if (recipe == null) continue;
 
-            Hephaestus.log("  Checking recipe: " + recipeId);
-            Hephaestus.log("    - Discoverable: " + recipe.isDiscoverable());
-
             if (recipe.isDiscoverable()) {
                 boolean matches = recipe.matchesIngredientsForDiscovery(ingredients);
-                Hephaestus.log("    - Matches ingredients: " + matches);
 
                 if (matches) {
-                    Hephaestus.log("  -> Found matching recipe: " + recipeId);
                     return recipe;
                 }
             }
         }
 
-        Hephaestus.log("No matching recipe found for discovery");
         return null;
     }
 
@@ -230,28 +222,19 @@ public class RecipeManager {
             return matchingRecipes;
         }
 
-        Hephaestus.log("Checking " + jobRecipeIds.size() + " recipes for job '" + jobId + "'");
-
         // Find all recipes that match ingredients for discovery
         for (String recipeId : jobRecipeIds) {
             JobRecipe recipe = recipes.get(recipeId);
             if (recipe == null) continue;
 
-            Hephaestus.log("  Checking recipe: " + recipeId);
-            Hephaestus.log("    - Discoverable: " + recipe.isDiscoverable());
-
             if (recipe.isDiscoverable()) {
                 boolean matches = recipe.matchesIngredientsForDiscovery(ingredients);
-                Hephaestus.log("    - Matches ingredients: " + matches);
 
                 if (matches) {
-                    Hephaestus.log("  -> Found matching recipe: " + recipeId);
                     matchingRecipes.add(recipe);
                 }
             }
         }
-
-        Hephaestus.log("Found " + matchingRecipes.size() + " matching recipe(s) for discovery");
         return matchingRecipes;
     }
 
