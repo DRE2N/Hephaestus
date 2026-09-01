@@ -43,6 +43,5 @@ class GrindstoneCommand {
         grindstone.setPricePerOrb(pricePerOrb.orElse(10));
         grindstone.setFullRefundChance((float) fullRefundChance.orElse(0.0));
         player.sendRichMessage("<green>Grindstone created with " + (successChance * 100) + "% shard chance, " + (fullRefundChance.orElse(0.0) * 100) + "% full refund chance, and " + pricePerOrb.orElse(10) + " coins per orb.");
-
     }
 }
