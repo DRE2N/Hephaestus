@@ -7,6 +7,7 @@ repositories {
     maven("https://repo.papermc.io/maven-public/")
     maven("https://repo.erethon.de/snapshots/")
     maven("https://repo.erethon.de/releases/")
+    maven("https://eldonexus.de/repository/maven-public/")
 }
 plugins {
     `java-library`
@@ -32,6 +33,8 @@ dependencies {
     compileOnly("de.erethon.hecate:Hecate:1.3-SNAPSHOT")
     compileOnly("de.erethon.tyche:Tyche:1.0-SNAPSHOT")
     compileOnly("de.erethon.questsxl:QuestsXL:1.0.6-SNAPSHOT")
+    compileOnly("net.strokkur.commands:processor-paper:2.3.0")
+    annotationProcessor("net.strokkur.commands:processor-paper:2.3.0")
 }
 
 tasks {
