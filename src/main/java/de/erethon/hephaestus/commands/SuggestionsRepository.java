@@ -4,7 +4,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import de.erethon.hephaestus.items.HItemLibrary;
-import net.minecraft.commands.CommandSourceStack;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.strokkur.commands.CustomSuggestion;
 import org.jspecify.annotations.Nullable;
 
@@ -29,7 +29,7 @@ class SuggestionsRepository {
     @interface UpgradeSuggestions {}
 
     @BlockDataKeySuggestions
-    public static CompletableFuture<Suggestions> suggestBlockDataKeys(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
+    static CompletableFuture<Suggestions> suggestBlockDataKeys(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
         String input = builder.getRemaining().toLowerCase();
         itemLibrary().getKeys().forEach(key -> {
             String keyString = key.toString();
@@ -41,7 +41,7 @@ class SuggestionsRepository {
     }
 
     @UpgradeSuggestions
-    public static CompletableFuture<Suggestions> suggestUpgradeKeys(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
+    static CompletableFuture<Suggestions> suggestUpgradeKeys(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
         String input = builder.getRemaining().toLowerCase();
         itemLibrary().getUpgradeKeys().forEach(upgradeKey -> {
             if (upgradeKey.toLowerCase().startsWith(input)) {
